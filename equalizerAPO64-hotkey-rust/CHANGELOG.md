@@ -3,9 +3,12 @@
 All notable changes to this project are documented here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [1.4.2] - 2026-07-01
+## [1.4.2] - 2026-10-25
 
-First public release of this fork, ported 1:1 to pure Rust.
+Pure-Rust release of the C++ `equalizerAPO64-hotkey` 1.4.2 fork (upstream release
+date 2026-07-01). Behaviour, configuration format, registry layout and the global
+hotkey implementation are ported 1:1; see `PARITY.md` for the comparison and the
+verification evidence.
 
 ### Added
 - **Global hotkeys for filters** — assign a system-wide shortcut to any filter in the Editor
