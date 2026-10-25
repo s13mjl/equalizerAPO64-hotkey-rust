@@ -368,7 +368,9 @@ only. `Publisher`/`DisplayIcon` (not written by the NSIS script) were removed.
       `QueryInterface`/`AddRef` through the primary interface reach it; it fails on
       the old code (the outer counter stayed 0).
       Live confirmation with the shipped build
-      (sha256 `C18A3293E59BBECF890642F55A218BEDDC9EC3A2553C0C10AAC39F315400FE5E`),
+      (sha256 `C18A3293E59BBECF890642F55A218BEDDC9EC3A2553C0C10AAC39F315400FE5E`;
+      the published installer payload is a `--workspace` rebuild of the same
+      source, sha256 `0D8AEF1B0F3AD3CC…`),
       `difftest/apo-backup-20261024/render-confirm.txt`: 88 log lines, seven
       instances (4 pre-mix + 3 post-mix), **4x `LockForProcess successful`**, 4x
       `Reallocating internal double-precision buffers for 480/528 frames and 2/2
