@@ -1,0 +1,61 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/common",
+    "crates/expression",
+    "crates/apo-info",
+    "crates/filters",
+    "crates/engine",
+    "crates/apo",
+    "crates/editor",
+    "crates/device-selector",
+    "crates/update-checker",
+    "crates/voicemeeter-client",
+    "crates/benchmark",
+    "crates/setup",
+]
+
+[workspace.package]
+version = "1.4.2"
+edition = "2021"
+license = "GPL-2.0-or-later"
+authors = ["EqualizerAPO Contributors"]
+repository = "https://github.com/s13mjl/equalizerAPO64-hotkey-rust"
+
+[workspace.dependencies]
+eapo-common = { path = "crates/common" }
+eapo-expression = { path = "crates/expression" }
+eapo-apo-info = { path = "crates/apo-info" }
+eapo-filters = { path = "crates/filters" }
+eapo-engine = { path = "crates/engine" }
+
+windows = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Com",
+    "Win32_System_Com_StructuredStorage",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Registry",
+    "Win32_System_Services",
+    "Win32_System_SystemInformation",
+    "Win32_System_Threading",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
+regex = "1"
+once_cell = "1"
+libloading = "0.8"
+rustfft = "6.2"
+hound = "3.5"
+parking_lot = "0.12"
+eframe = "0.31"
+egui = "0.31"
+rfd = "0.15"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"

@@ -1,0 +1,10 @@
+# Build caches (the port's own .gitignore covers its subdirectories as well)
+equalizerAPO64-hotkey-rust/target/
+equalizerAPO64-hotkey-rust/target-live/
+equalizerAPO64-hotkey-rust/installer-output/
+
+# Upstream C++ project this port is compared against (input material)
+equalizerAPO64-hotkey/
+
+# Test/verification scratch: captures, dumps, symbol caches
+difftest/

@@ -1,0 +1,7 @@
+/target
+**/*.rs.bk
+*.pdb
+/installer-output
+**/target/
+testdata/vst-test-plugin/Cargo.lock
+/target-live

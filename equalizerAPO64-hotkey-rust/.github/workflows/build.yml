@@ -1,0 +1,42 @@
+name: Build Rust EqualizerAPO
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+      - name: Test
+        run: cargo test --workspace --all-targets
+      - name: Build
+        run: cargo build --release --workspace
+      - name: Stage artifacts
+        shell: cmd
+        run: build.bat
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: EqualizerAPO64-Hotkey-Rust
+          path: |
+            target/release/EqualizerAPO.dll
+            target/release/Editor.exe
+            target/release/DeviceSelector.exe
+            target/release/UpdateChecker.exe
+            target/release/VoicemeeterClient.exe
+            target/release/Benchmark.exe
+            target/release/Setup.exe

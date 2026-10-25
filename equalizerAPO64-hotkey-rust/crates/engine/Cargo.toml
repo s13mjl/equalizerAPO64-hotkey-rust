@@ -1,0 +1,14 @@
+[package]
+name = "eapo-engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+eapo-common.workspace = true
+eapo-expression.workspace = true
+eapo-filters.workspace = true
+windows.workspace = true
+parking_lot.workspace = true
+regex.workspace = true

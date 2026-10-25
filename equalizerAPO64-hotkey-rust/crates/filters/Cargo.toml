@@ -1,0 +1,23 @@
+[package]
+name = "eapo-filters"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+eapo-common.workspace = true
+eapo-expression.workspace = true
+windows = { workspace = true, features = [
+    "Win32_Media_Audio",
+    "Win32_Media_Audio_Endpoints",
+    "Win32_System_Com",
+    "Win32_System_Com_StructuredStorage",
+    "Win32_System_Variant",
+] }
+rustfft.workspace = true
+hound.workspace = true
+libloading.workspace = true
+regex.workspace = true
+claxon = "0.4"
+lewton = "0.10"

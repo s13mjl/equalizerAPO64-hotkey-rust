@@ -1,0 +1,18 @@
+[package]
+name = "eapo-benchmark"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "Benchmark"
+path = "src/main.rs"
+
+[dependencies]
+eapo-common.workspace = true
+eapo-apo-info.workspace = true
+eapo-engine.workspace = true
+eapo-filters.workspace = true
+windows.workspace = true
+hound.workspace = true

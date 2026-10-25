@@ -1,0 +1,26 @@
+[package]
+name = "eapo-editor"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "Editor"
+path = "src/main.rs"
+
+[dependencies]
+eapo-common = { workspace = true, features = ["gui"] }
+eapo-apo-info.workspace = true
+eapo-engine.workspace = true
+eapo-filters.workspace = true
+eapo-expression.workspace = true
+windows = { workspace = true, features = ["Win32_UI_Shell", "Win32_UI_Controls_Dialogs", "Win32_Graphics_Gdi", "Win32_System_LibraryLoader", "Win32_Media_Audio", "Win32_Globalization"] }
+eframe.workspace = true
+egui.workspace = true
+once_cell.workspace = true
+regex.workspace = true
+rustfft.workspace = true
+hound.workspace = true
+serde_json = "1"
+claxon = "0.4"

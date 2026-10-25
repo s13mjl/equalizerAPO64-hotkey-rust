@@ -1,0 +1,20 @@
+[package]
+name = "eapo-update-checker"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "UpdateChecker"
+path = "src/main.rs"
+# The test harness executable name contains "Update", which trips Windows'
+# installer-detection UAC heuristic; this binary has no unit tests.
+test = false
+
+[dependencies]
+eapo-common = { workspace = true, features = ["gui"] }
+windows = { workspace = true, features = ["Win32_Networking_WinHttp", "Win32_UI_Shell", "Win32_Globalization"] }
+eframe.workspace = true
+egui.workspace = true
+serde_json = "1"
