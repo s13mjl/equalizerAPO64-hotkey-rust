@@ -116,6 +116,17 @@ installed flags.
 | Source | Rust | Status |
 |---|---|---|
 | `main.cpp`, `MainWindow.*` | `main.rs`, `main_window.rs` | verified (GUI launch/screenshot, menus/actions, prefs) |
+
+Startup file selection follows `main.cpp` exactly: the config directory is the
+registry `ConfigPath` (falling back to the working directory), positional
+arguments are opened relative to it, and with no arguments the editor opens
+`<ConfigPath>\config.txt`. It deliberately does **not** restore the previous
+session's tabs — an earlier port revision did, which could silently open a file
+from another directory while the audio engine kept reading the live config.
+`tests::commented_rows_keep_their_type_and_enable_cleanly` pins the other
+editor-side contract that caused confusion: a leading `#` is the "row switched
+off" marker (`CommentFilterGUI::store` prefixes it), the row keeps its filter
+type, and switching the power on rewrites the active line verbatim.
 | `FilterTable.*`, `Row`, `MimeData`, `Template` | `filter_table.rs` | verified (parse/save CRLF, drag reorder, templates) |
 | `AnalysisThread.*`, `AnalysisPlot*`, `FrequencyPlot*` | `analysis.rs`, `plot.rs` | verified (peak gain 4.5 dB matches C++ for same config) |
 | `guis/*` (all factories/GUIs) | `guis.rs` (+ `vst_editor.rs`, `calibration.rs`) | ported / partially verified |

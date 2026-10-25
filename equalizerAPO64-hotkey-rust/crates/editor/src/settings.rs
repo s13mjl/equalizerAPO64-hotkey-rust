@@ -63,8 +63,6 @@ pub struct GlobalPreferences {
     pub analysis_zoom_y: f64,
     pub analysis_scroll_x: i32,
     pub analysis_scroll_y: i32,
-    pub open_files: Vec<String>,
-    pub tab_index: i32,
     pub recent_files: Vec<String>,
     pub window_size: Option<(f32, f32)>,
     pub window_pos: Option<(f32, f32)>,
@@ -86,8 +84,6 @@ impl Default for GlobalPreferences {
             analysis_zoom_y: 1.0,
             analysis_scroll_x: 0,
             analysis_scroll_y: 0,
-            open_files: Vec::new(),
-            tab_index: 0,
             recent_files: Vec::new(),
             window_size: None,
             window_pos: None,
@@ -111,8 +107,6 @@ impl GlobalPreferences {
         p.analysis_zoom_y = read_float(ANALYSIS_REGPATH, "zoomY", 1.0);
         p.analysis_scroll_x = read_int(ANALYSIS_REGPATH, "scrollX", i32::MIN);
         p.analysis_scroll_y = read_int(ANALYSIS_REGPATH, "scrollY", i32::MIN);
-        p.open_files = eapo_common::registry_helper::read_multi_value(EDITOR_REGPATH, "openFiles").unwrap_or_default();
-        p.tab_index = read_int(EDITOR_REGPATH, "tabIndex", 0);
         p.recent_files = eapo_common::registry_helper::read_multi_value(EDITOR_REGPATH, "recentFiles").unwrap_or_default();
         p.language = eapo_common::registry_helper::read_value(EDITOR_REGPATH, "language").ok();
         p.show_toolbar = read_bool(EDITOR_REGPATH, "showToolbar", true);
@@ -147,8 +141,6 @@ impl GlobalPreferences {
         let _ = eapo_common::registry_helper::write_value(ANALYSIS_REGPATH, "zoomY", &self.analysis_zoom_y.to_string());
         write_int(ANALYSIS_REGPATH, "scrollX", self.analysis_scroll_x);
         write_int(ANALYSIS_REGPATH, "scrollY", self.analysis_scroll_y);
-        let _ = eapo_common::registry_helper::write_multi_value(EDITOR_REGPATH, "openFiles", &self.open_files);
-        write_int(EDITOR_REGPATH, "tabIndex", self.tab_index);
         let _ = eapo_common::registry_helper::write_multi_value(EDITOR_REGPATH, "recentFiles", &self.recent_files);
         if let Some((w, h)) = self.window_size {
             let _ = eapo_common::registry_helper::write_value(EDITOR_REGPATH, "windowSize", &format!("{w}x{h}"));

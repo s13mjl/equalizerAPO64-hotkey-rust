@@ -1142,6 +1142,30 @@ mod tests {
         FilterItem::new(1, line, &c)
     }
 
+    /// A leading `#` is the Editor's "row is switched off" marker
+    /// (`CommentFilterGUI::store` prefixes it while the power button is off), not
+    /// a lossy comment: the row keeps its real filter type, so switching the
+    /// power on writes the active line back without retyping anything.
+    #[test]
+    fn commented_rows_keep_their_type_and_enable_cleanly() {
+        let mut preamp = item("# Preamp: 50 dB");
+        assert_eq!(preamp.kind, FilterKind::Preamp);
+        assert!(!preamp.enabled);
+        assert_eq!(preamp.line, "# Preamp: 50 dB");
+
+        preamp.set_enabled(true);
+        assert_eq!(preamp.line, "Preamp: 50 dB");
+
+        preamp.set_enabled(false);
+        assert_eq!(preamp.line, "# Preamp: 50 dB");
+
+        let mut active = item("Preamp: -6 dB");
+        assert_eq!(active.kind, FilterKind::Preamp);
+        assert!(active.enabled);
+        active.set_enabled(false);
+        assert_eq!(active.line, "# Preamp: -6 dB");
+    }
+
     #[test]
     fn classifies_filter_guis() {
         assert_eq!(item("Preamp: -6 dB").kind, FilterKind::Preamp);

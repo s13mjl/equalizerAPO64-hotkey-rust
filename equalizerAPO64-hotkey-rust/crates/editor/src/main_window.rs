@@ -255,13 +255,6 @@ impl EditorApp {
         }
         app.refresh_channel_state(false);
 
-        // Open the previously open files.
-        for file in prefs.open_files.iter() {
-            app.load_path(Path::new(file));
-        }
-        if !app.tabs.is_empty() {
-            app.active_tab = (prefs.tab_index.max(0) as usize).min(app.tabs.len() - 1);
-        }
         // Command line arguments (absolute paths as in main.cpp).
         let mut any_arg = false;
         for arg in args {
@@ -604,13 +597,6 @@ impl EditorApp {
             prefs.analysis_zoom_y = self.analysis_state.zoom_y;
             prefs.analysis_scroll_x = self.analysis_state.scroll.x as i32;
             prefs.analysis_scroll_y = self.analysis_state.scroll.y as i32;
-            prefs.open_files = self
-                .tabs
-                .iter()
-                .filter(|t| !t.config_path.is_empty())
-                .map(|t| t.config_path.clone())
-                .collect();
-            prefs.tab_index = self.active_tab as i32;
             prefs.recent_files = self.recent_files.clone();
             prefs.window_size = Some(size);
             prefs.show_toolbar = self.show_toolbar;
