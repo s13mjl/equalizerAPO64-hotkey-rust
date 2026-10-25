@@ -17,7 +17,12 @@ copy /Y target\release\Benchmark.exe "%STAGE%\" >nul
 copy /Y target\release\Setup.exe "%STAGE%\..\" >nul
 xcopy /E /I /Y assets\setup-config "%STAGE%\config" >nul
 
-echo Build finished. Installer payload is in installer-output.
+rem Single-file installer: Setup.exe with the payload appended.
+target\release\PackPayload.exe build "%STAGE%" target\release\Setup.exe installer-output\Setup-standalone.exe
+if errorlevel 1 goto :error
+
+echo Build finished. Installer payload is in installer-output;
+echo the single-file installer is installer-output\Setup-standalone.exe.
 goto :eof
 
 :error

@@ -80,7 +80,11 @@ The binaries are produced under `target\release`:
 - `Setup.exe`
 
 Run `build.bat` to build the workspace, stage all binaries into
-`installer-output\files` and (optionally) assemble the installer payload.
+`installer-output\files`, and produce the **single-file installer**
+`installer-output\Setup-standalone.exe` (the `Setup.exe` image with the staged
+payload appended; `PackPayload.exe` builds and inspects it). The release
+executable extracts that payload to `%TEMP%` for the duration of the
+installation and removes it afterwards.
 
 ## Usage
 

@@ -933,6 +933,7 @@ dependencies = [
  "eapo-common",
  "eframe",
  "egui",
+ "flate2",
  "regex",
  "windows 0.61.3",
 ]

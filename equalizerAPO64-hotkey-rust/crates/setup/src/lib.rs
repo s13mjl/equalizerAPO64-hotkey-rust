@@ -12,6 +12,7 @@ mod elevation;
 mod files;
 mod install;
 mod lang;
+pub mod payload;
 mod registry;
 mod shortcuts;
 mod uninstall;
@@ -90,9 +91,13 @@ pub fn run() {
         }
 
         if silent {
-            std::process::exit(app::run_silent_install(install_dir_override));
+            let code = app::run_silent_install(install_dir_override);
+            payload::cleanup();
+            std::process::exit(code);
         }
-        if let Err(error) = app::run_installer() {
+        let result = app::run_installer();
+        payload::cleanup();
+        if let Err(error) = result {
             util::message_error(
                 &format!("{}\n\n{error}", full_name()),
                 language.error_title(),

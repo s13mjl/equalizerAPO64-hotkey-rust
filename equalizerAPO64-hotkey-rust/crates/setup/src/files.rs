@@ -111,15 +111,23 @@ pub const VST_PLUGINS_DIR: &str = "VSTPlugins";
 pub const CONFIG_DIR: &str = "config";
 pub const QT_DIR: &str = "qt";
 
-/// Locates the payload directory: `files\` next to Setup.exe when present,
-/// otherwise the executable directory (`target\release`).
+/// Locates the payload directory.
+///
+/// 1. `files\` next to Setup.exe (development layout; the uninstaller never
+///    needs a payload).
+/// 2. The archive appended to the running executable by `PackPayload`
+///    (single-file release), extracted once into `%TEMP%`.
+/// 3. The executable directory (`target\release`), which holds the binaries when
+///    Setup is started from the build output.
 pub fn find_staging(exe_dir: &Path) -> PathBuf {
     let files = exe_dir.join("files");
     if files.join("EqualizerAPO.dll").is_file() {
-        files
-    } else {
-        exe_dir.to_path_buf()
+        return files;
     }
+    if let Some(extracted) = crate::payload::embedded_staging() {
+        return extracted;
+    }
+    exe_dir.to_path_buf()
 }
 
 /// Returns the required payload files that are missing from `staging`.

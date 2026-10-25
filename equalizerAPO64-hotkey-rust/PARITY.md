@@ -160,10 +160,21 @@ type, and switching the power on rewrites the active line verbatim.
 |---|---|---|
 | `UpdateChecker/*` | `crates/update-checker/src/main.rs` | ported (URL, skip/lastCheck, task install, WinHTTP) |
 | `Benchmark/Benchmark.cpp` | `crates/benchmark/src/main.rs` | verified (runtime differential) |
-| `Setup/Setup.nsi` (+ 32/ARM64 variants) | `crates/setup` (`eapo-wizard` + `Setup`) | verified (31 tests, release manifest) |
+| `Setup/Setup.nsi` (+ 32/ARM64 variants) | `crates/setup` (`eapo-wizard` + `Setup`) | verified (35 tests, release manifest, single-file payload) |
 | `Setup/config/*`, `Setup/*.url` | `assets/setup-config`, `assets/*.url` | copied |
 | `build.bat`, CI | root build script/workflow | adapted |
 | `README.md`, `CHANGELOG.md`, `License.txt` | mirrored/adapted | ported |
+
+### Single-file installer
+
+The NSIS original ships `Setup.exe` next to a `files\` directory. The port keeps
+that layout for development but also produces one executable: `PackPayload` (a
+build-time tool, not shipped) appends a compressed archive of `files\` to the
+`Setup.exe` image, and the installer finds it through a footer at the end of its
+own file, extracts it to `%TEMP%\eapo-setup-<pid>` once and deletes it when the
+wizard exits. The container format, the extraction and its path-traversal guards
+are unit-tested, and the published release asset was re-downloaded, extracted and
+compared byte for byte with the build output (12/12 files identical).
 
 ### Benchmark differential evidence
 
