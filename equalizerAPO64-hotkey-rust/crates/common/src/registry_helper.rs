@@ -37,7 +37,7 @@ use windows::Win32::System::Memory::{
     GetProcessHeap, HeapAlloc, HeapFree, LocalAlloc, HEAP_FLAGS, HEAP_ZERO_MEMORY, LPTR,
 };
 use windows::Win32::System::Registry::{
-    RegCloseKey, RegCreateKeyExW, RegDeleteKeyExW, RegDeleteValueW, RegEnumKeyExW,
+    RegCloseKey, RegCreateKeyExW, RegDeleteKeyExW, RegDeleteValueW, RegEnumKeyExW, RegEnumValueW,
     RegGetKeySecurity, RegOpenKeyExW, RegQueryInfoKeyW, RegQueryValueExW, RegSetKeySecurity,
     RegSetValueExW, HKEY, HKEY_CLASSES_ROOT, HKEY_CURRENT_CONFIG, HKEY_CURRENT_USER,
     HKEY_LOCAL_MACHINE, HKEY_USERS, KEY_ALL_ACCESS, KEY_ENUMERATE_SUB_KEYS, KEY_QUERY_VALUE,
@@ -1041,6 +1041,53 @@ pub fn enum_sub_keys(key: &str) -> Result<Vec<String>> {
 /// Alias for [`enum_sub_keys`], matching the capitalization of the stub.
 pub fn enum_subkeys(key: &str) -> Result<Vec<String>> {
     enum_sub_keys(key)
+}
+
+/// Names of the values stored in a key.
+pub fn enum_value_names(key: &str) -> Result<Vec<String>> {
+    let handle = KeyGuard::new(open_key(key, KEY_QUERY_VALUE | KEY_WOW64_64KEY)?);
+    let mut result = Vec::new();
+    let mut value_name = [0u16; 256];
+    let mut index = 0u32;
+    loop {
+        let mut length = value_name.len() as u32;
+        let status = unsafe {
+            RegEnumValueW(
+                handle.raw(),
+                index,
+                Some(PWSTR(value_name.as_mut_ptr())),
+                &mut length,
+                None,
+                None,
+                None,
+                None,
+            )
+        };
+        index += 1;
+        if status == ERROR_SUCCESS {
+            result.push(String::from_utf16_lossy(&value_name[..length as usize]));
+        } else if status == ERROR_NO_MORE_ITEMS {
+            break;
+        } else {
+            return Err(RegistryException(format!(
+                "Error while enumerating values of registry key {}: {}",
+                key,
+                system_error(status)
+            )));
+        }
+    }
+    Ok(result)
+}
+
+/// Deletes a key together with all of its subkeys and values.
+pub fn delete_key_tree(key: &str) -> Result<()> {
+    if !key_exists(key) {
+        return Ok(());
+    }
+    for child in enum_sub_keys(key).unwrap_or_default() {
+        delete_key_tree(&format!("{}\\{}", key, child))?;
+    }
+    delete_key(key)
 }
 
 /// Port of `RegistryHelper::keyExists`.  Invalid or missing keys return false.

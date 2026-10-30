@@ -111,8 +111,10 @@ impl DeviceTestDialog {
         let mut abort_acknowledged = false;
 
         egui::Modal::new(egui::Id::new("device_test_dialog")).show(ctx, |ui| {
-            ui.set_min_width(580.0);
-            ui.set_min_height(360.0);
+            let dialog_width = (ctx.screen_rect().width() - 120.0).clamp(520.0, 760.0);
+            let table_height = (ctx.screen_rect().height() * 0.34).clamp(150.0, 260.0);
+            ui.set_min_width(dialog_width);
+            ui.set_min_height(420.0);
             ui.horizontal(|ui| {
                 ui.heading(crate::i18n::tr("Testing APO installation on devices..."));
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -130,7 +132,7 @@ impl DeviceTestDialog {
             ui.separator();
 
             egui::ScrollArea::vertical()
-                .max_height(240.0)
+                .max_height(table_height)
                 .auto_shrink([false, false])
                 .show(ui, |ui| {
                     egui::Grid::new("device_test_grid")

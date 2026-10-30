@@ -891,6 +891,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "eapo-editor-core"
+version = "1.4.2"
+dependencies = [
+ "claxon",
+ "eapo-common",
+ "eapo-engine",
+ "eapo-filters",
+ "regex",
+ "rustfft",
+ "serde_json",
+ "windows 0.61.3",
+]
+
+[[package]]
+name = "eapo-editor-native"
+version = "1.4.2"
+dependencies = [
+ "eapo-apo-info",
+ "eapo-common",
+ "eapo-editor-core",
+ "eapo-filters",
+ "windows 0.61.3",
+]
+
+[[package]]
 name = "eapo-engine"
 version = "1.4.2"
 dependencies = [
@@ -922,6 +947,13 @@ dependencies = [
  "libloading",
  "regex",
  "rustfft",
+ "windows 0.61.3",
+]
+
+[[package]]
+name = "eapo-mem-probe"
+version = "1.4.2"
+dependencies = [
  "windows 0.61.3",
 ]
 

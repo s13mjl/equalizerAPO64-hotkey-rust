@@ -8,3 +8,7 @@ equalizerAPO64-hotkey/
 
 # Test/verification scratch: captures, dumps, symbol caches
 difftest/
+
+# Local agent settings and scratch cargo target dirs
+.qoder/
+equalizerAPO64-hotkey-rust/target-build/

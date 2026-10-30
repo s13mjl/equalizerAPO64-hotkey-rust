@@ -72,7 +72,8 @@ cargo build --release --workspace
 The binaries are produced under `target\release`:
 
 - `EqualizerAPO.dll` (COM APO, `crates/apo`)
-- `Editor.exe`
+- `Editor.exe` (native Win32/GDI frontend, `crates/editor-native`; the former
+  egui frontend is still available as `EditorEgui.exe`, see `PARITY.md`)
 - `DeviceSelector.exe`
 - `UpdateChecker.exe`
 - `VoicemeeterClient.exe`
@@ -81,7 +82,7 @@ The binaries are produced under `target\release`:
 
 Run `build.bat` to build the workspace, stage all binaries into
 `installer-output\files`, and produce the **single-file installer**
-`installer-output\Setup-standalone.exe` (the `Setup.exe` image with the staged
+`installer-output\Setup.exe` (the `Setup.exe` image with the staged
 payload appended; `PackPayload.exe` builds and inspects it). The release
 executable extracts that payload to `%TEMP%` for the duration of the
 installation and removes it afterwards.

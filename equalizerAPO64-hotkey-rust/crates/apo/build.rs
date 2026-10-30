@@ -46,14 +46,66 @@ fn run(program: &Path, args: &[String]) {
     }
 }
 
+fn kits_root_and_version() -> (PathBuf, String) {
+    // Prefer the INCLUDE environment set up by a Visual Studio prompt.
+    if let Ok(include) = std::env::var("INCLUDE") {
+        for dir in include.split(';') {
+            let dir = PathBuf::from(dir);
+            if dir
+                .file_name()
+                .is_some_and(|name| name.eq_ignore_ascii_case("um"))
+            {
+                if let Some(version) = dir
+                    .parent()
+                    .and_then(|parent| parent.file_name())
+                    .and_then(|name| name.to_str())
+                {
+                    if let Some(kits) = dir
+                        .parent()
+                        .and_then(|parent| parent.parent())
+                        .and_then(|parent| parent.parent())
+                    {
+                        return (kits.to_path_buf(), version.to_string());
+                    }
+                }
+            }
+        }
+    }
+    let mut candidates: Vec<PathBuf> = vec![r"C:\Program Files (x86)\Windows Kits\10".into()];
+    for drive in ["D", "E", "F"] {
+        candidates.push(PathBuf::from(format!(r"{drive}:\Windows Kits\10")));
+    }
+    for kits in candidates {
+        let include_root = kits.join("Include");
+        let Ok(entries) = std::fs::read_dir(&include_root) else {
+            continue;
+        };
+        let mut versions: Vec<String> = entries
+            .filter_map(|entry| entry.ok())
+            .filter(|entry| {
+                let path = entry.path();
+                path.join("um").is_dir() && path.join("ucrt").is_dir()
+            })
+            .filter_map(|entry| entry.file_name().to_str().map(|name| name.to_string()))
+            .collect();
+        versions.sort();
+        if let Some(version) = versions.pop() {
+            return (kits, version);
+        }
+    }
+    (
+        PathBuf::from(r"C:\Program Files (x86)\Windows Kits\10"),
+        "10.0.26100.0".into(),
+    )
+}
+
 fn main() {
     println!("cargo:rerun-if-changed=src/cxx/apo_shim.cpp");
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-env-changed=CARGO_FEATURE_LIVE_PROBE");
 
     let out_dir = PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR"));
-    let kits = PathBuf::from(r"C:\Program Files (x86)\Windows Kits\10");
-    let kit_version = "10.0.26100.0";
+    let (kits, kit_version) = kits_root_and_version();
 
     let msvc = newest_msvc_tools(&vswhere_install());
     let cl = msvc.join(r"bin\Hostx64\x64\cl.exe");

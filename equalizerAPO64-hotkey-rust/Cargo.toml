@@ -13,6 +13,9 @@ members = [
     "crates/voicemeeter-client",
     "crates/benchmark",
     "crates/setup",
+    "crates/editor-native",
+    "crates/editor-core",
+    "tools/mem-probe",
 ]
 
 [workspace.package]
@@ -28,6 +31,7 @@ eapo-expression = { path = "crates/expression" }
 eapo-apo-info = { path = "crates/apo-info" }
 eapo-filters = { path = "crates/filters" }
 eapo-engine = { path = "crates/engine" }
+eapo-editor-core = { path = "crates/editor-core" }
 
 windows = { version = "0.61", features = [
     "Win32_Foundation",

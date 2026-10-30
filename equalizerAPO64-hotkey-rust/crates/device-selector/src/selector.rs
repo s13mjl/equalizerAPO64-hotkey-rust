@@ -182,16 +182,34 @@ impl SelectorApp {
         let mut cancel_clicked = false;
         let mut ok_clicked = false;
 
-        egui::CentralPanel::default().show(ctx, |ui| {
-            ui.label(crate::i18n::tr("Please select the devices for which Equalizer APO is to be installed:"));
-            ui.add_space(4.0);
+        egui::TopBottomPanel::bottom("device_selector_actions").show(ctx, |ui| {
+            ui.add_space(2.0);
+            let changed = self.is_changed();
+            let any_checked = self.devices.iter().any(|entry| entry.checked);
+            let show_ok = changed || !any_checked;
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                let cancel_text = if show_ok { "Cancel" } else { "Close" };
+                if ui.button(cancel_text).clicked() {
+                    cancel_clicked = true;
+                }
+                if show_ok
+                    && ui
+                        .add_enabled(changed, egui::Button::new(crate::i18n::tr("OK")))
+                        .clicked()
+                {
+                    ok_clicked = true;
+                }
+            });
+        });
 
-            egui::ScrollArea::vertical()
+        egui::CentralPanel::default().show(ctx, |ui| {
+            egui::ScrollArea::both()
                 .id_salt("device_tree")
-                .max_height(230.0)
-                .min_scrolled_height(190.0)
                 .auto_shrink([false, false])
                 .show(ui, |ui| {
+                    ui.label(crate::i18n::tr("Please select the devices for which Equalizer APO is to be installed:"));
+                    ui.add_space(4.0);
+
                     egui::Grid::new("device_tree_grid")
                         .num_columns(3)
                         .spacing([18.0, 4.0])
@@ -290,6 +308,16 @@ impl SelectorApp {
                                 }
                             }
                         });
+
+                    ui.add_space(4.0);
+                    ui.checkbox(
+                        &mut self.troubleshooting_open, crate::i18n::tr("Troubleshooting options (only use in case of problems)"),
+                    );
+                    if self.troubleshooting_open {
+                        egui::Frame::group(ui.style()).show(ui, |ui| {
+                            self.draw_troubleshooting(ui);
+                        });
+                    }
                 });
 
             if copy_requested {
@@ -308,36 +336,6 @@ impl SelectorApp {
                 }
                 ctx.copy_text(command);
             }
-
-            ui.add_space(4.0);
-            ui.checkbox(
-                &mut self.troubleshooting_open, crate::i18n::tr("Troubleshooting options (only use in case of problems)"),
-            );
-            if self.troubleshooting_open {
-                egui::Frame::group(ui.style()).show(ui, |ui| {
-                    self.draw_troubleshooting(ui);
-                });
-            }
-
-            ui.add_space(4.0);
-            ui.separator();
-
-            let changed = self.is_changed();
-            let any_checked = self.devices.iter().any(|entry| entry.checked);
-            let show_ok = changed || !any_checked;
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let cancel_text = if show_ok { "Cancel" } else { "Close" };
-                if ui.button(cancel_text).clicked() {
-                    cancel_clicked = true;
-                }
-                if show_ok
-                    && ui
-                        .add_enabled(changed, egui::Button::new(crate::i18n::tr("OK")))
-                        .clicked()
-                {
-                    ok_clicked = true;
-                }
-            });
         });
 
         if cancel_clicked {

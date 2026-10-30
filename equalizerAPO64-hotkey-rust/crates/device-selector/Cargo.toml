@@ -8,11 +8,24 @@ authors.workspace = true
 [[bin]]
 name = "DeviceSelector"
 path = "src/main.rs"
+# The UAC manifest makes the test harness unlaunchable; keep unit tests in
+# library targets (same pattern as Setup).
+test = false
 
 [dependencies]
 eapo-common = { workspace = true, features = ["gui"] }
 eapo-apo-info.workspace = true
-windows = { workspace = true, features = ["Win32_System_Pipes", "Win32_System_IO", "Win32_System_SystemServices", "Win32_System_Shutdown"] }
+windows = { workspace = true, features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_System_IO",
+    "Win32_System_Pipes",
+    "Win32_System_Shutdown",
+    "Win32_System_SystemServices",
+    "Win32_System_Threading",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }
 eframe.workspace = true
 egui.workspace = true
 once_cell.workspace = true

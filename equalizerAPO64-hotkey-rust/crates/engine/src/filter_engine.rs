@@ -453,8 +453,17 @@ impl FilterEngine {
         let config_path = match registry_helper::read_value(APP_REGPATH, "ConfigPath") {
             Ok(v) => v,
             Err(e) => {
-                eapo_common::error_log!("Can't read config path because of: {}", e);
-                return;
+                if custom_path.is_empty() {
+                    eapo_common::error_log!("Can't read config path because of: {}", e);
+                    return;
+                }
+                // The editor's analysis preview passes an explicit path; keep
+                // working when EqualizerAPO is not registered (yet).
+                eapo_common::trace_log!(
+                    "Can't read config path because of: {}. Using the explicitly requested file.",
+                    e
+                );
+                String::new()
             }
         };
 
@@ -476,10 +485,10 @@ impl FilterEngine {
             factories::initialize_factories(&mut loader);
         }
 
-        if !config_path.is_empty() {
+        if !config_path.is_empty() || !custom_path.is_empty() {
             self.load_config(custom_path);
 
-            if self.notification_thread.is_none() && custom_path.is_empty() {
+            if !config_path.is_empty() && self.notification_thread.is_none() && custom_path.is_empty() {
                 let loader = self.loader.clone();
                 let semaphore = self.load_semaphore.0 .0 as usize;
                 let shutdown = self.shutdown_event.0 .0 as usize;
