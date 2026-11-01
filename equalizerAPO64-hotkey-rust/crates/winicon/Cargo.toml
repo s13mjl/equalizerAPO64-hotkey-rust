@@ -1,0 +1,9 @@
+[package]
+name = "eapo-winicon"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Build-script helper embedding the upstream application icons into Windows binaries."
+
+[lib]
+path = "src/lib.rs"

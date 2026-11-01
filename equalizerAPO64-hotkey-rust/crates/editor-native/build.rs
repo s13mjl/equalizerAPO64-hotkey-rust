@@ -1,4 +1,5 @@
 fn main() {
+    eapo_winicon::embed_icon("Editor", "../../assets/icons/Editor.ico");
     println!("cargo:rerun-if-changed=Editor.manifest");
     let manifest = std::path::Path::new("Editor.manifest")
         .canonicalize()

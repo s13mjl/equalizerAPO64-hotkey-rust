@@ -15,6 +15,7 @@ members = [
     "crates/setup",
     "crates/editor-native",
     "crates/editor-core",
+    "crates/winicon",
     "tools/mem-probe",
 ]
 
