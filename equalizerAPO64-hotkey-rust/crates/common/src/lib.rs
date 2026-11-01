@@ -6,6 +6,7 @@
 
 pub mod abstract_library;
 pub mod channel_helper;
+pub mod device_files;
 #[cfg(feature = "gui")]
 pub mod egui_fonts;
 pub mod gain_iterator;

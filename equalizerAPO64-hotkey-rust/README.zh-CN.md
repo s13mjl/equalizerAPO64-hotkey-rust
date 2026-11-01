@@ -93,6 +93,35 @@ cargo build --release --workspace
 热键存储在
 `HKCU\Software\EqualizerAPO\Hotkeys\<filterId>\keySequence`。
 
+### 按设备的实时配置文件
+
+默认情况下 APO 只读取一个文件 `<ConfigPath>\config.txt`，与原版一致。编辑器开箱
+即让设备跟随标签页里打开的文档，同样三个模式在**设置**菜单和**设备**菜单底部都
+能找到：
+
+| 模式 | 效果 |
+| --- | --- |
+| 当前标签页 | **默认值**。最前面的已保存标签页成为该设备的配置，切换标签页即切换预设。 |
+| 所有打开的标签页 | 加载全部已保存的标签页，按标签顺序叠加。 |
+| 无（使用 config.txt） | 编辑器从不写清单，仍按原版只加载 `config.txt`。 |
+
+选择结果会写入 `<ConfigPath>\device-files.cfg`：
+
+```text
+# Equalizer APO - live configuration files per device.
+[{4829078d-b25f-4c4b-b06a-f8b5bc97d5fd}]
+zmq.txt
+D:\configs\bass.txt
+```
+
+段头是设备的端点 GUID，其下的每一行是一个配置文件，按顺序加载；相对路径以配置
+目录为基准（编辑器写的是绝对路径，手写成相对路径同样有效）。清单文件放在配置文件
+旁边，是因为安装程序已经把完全访问权限授予了
+Users 组，所以写它不需要管理员权限；原本就会重载 `config.txt` 的目录监听同样会
+立刻发现清单的变化。可以手工编辑该文件。删除某台设备的段（或把模式切回*无*）
+即恢复默认行为；每台设备各存一个段，因此多台设备可以同时跟随不同的文件。每个文
+件内部的 `Include:` 依然有效，这正是把多个文件组成一个预设的方式。
+
 ## 实现说明
 
 原版 C++ 使用 WDK 的 `CBaseAudioProcessingObject`。Rust 版 APO 直接实现

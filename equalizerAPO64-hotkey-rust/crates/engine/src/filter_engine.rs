@@ -5,10 +5,12 @@
 //! semaphore gates reloads while a crossfade is still running.
 
 use std::collections::HashSet;
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 
 use eapo_common::channel_helper;
+use eapo_common::device_files;
 use eapo_common::precision_timer::PrecisionTimer;
 use eapo_common::{registry_helper, APP_REGPATH};
 use eapo_expression::{ExpressionHost, ParserError, ParserX, Value};
@@ -219,6 +221,29 @@ impl Loader {
         }
     }
 
+    /// The configuration files of one load pass, in load order. An endpoint
+    /// listed in the editor's manifest loads those files; anything else keeps
+    /// the original behaviour of reading `config.txt` from the configuration
+    /// directory.
+    pub(crate) fn config_files(&self, custom_path: &str) -> Vec<String> {
+        if !custom_path.is_empty() {
+            return vec![custom_path.to_string()];
+        }
+        let files = device_files::files_for(Path::new(&self.config_path), &self.device_guid);
+        if files.is_empty() {
+            return vec![format!("{}\\config.txt", self.config_path)];
+        }
+        eapo_common::trace_log!(
+            "Loading {} configuration file(s) for device {}",
+            files.len(),
+            self.device_guid
+        );
+        files
+            .iter()
+            .map(|file| file.to_string_lossy().into_owned())
+            .collect()
+    }
+
     pub(crate) fn load_config(&mut self, custom_path: &str) {
         let mut timer = PrecisionTimer::new();
         timer.start();
@@ -248,11 +273,8 @@ impl Loader {
 
         factories::start_of_configuration(self);
 
-        if custom_path.is_empty() {
-            let path = format!("{}\\config.txt", self.config_path);
+        for path in self.config_files(custom_path) {
             self.load_config_file(&path);
-        } else {
-            self.load_config_file(custom_path);
         }
 
         factories::end_of_configuration(self);
@@ -1052,6 +1074,100 @@ mod tests {
         let mut file = std::fs::File::create(&path).unwrap();
         file.write_all(contents.as_bytes()).unwrap();
         path
+    }
+
+    fn temp_dir(name: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "eapo_engine_dir_{}_{}",
+            std::process::id(),
+            name
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    fn write_file(dir: &std::path::Path, name: &str, contents: &str) {
+        std::fs::write(&dir.join(name), contents).unwrap();
+    }
+
+    #[test]
+    fn manifest_lists_files_in_order_for_the_device() {
+        let dir = temp_dir("manifest_order");
+        write_file(&dir, "config.txt", "Preamp: -1 dB");
+        write_file(&dir, "a.txt", "Preamp: -2 dB");
+        std::fs::create_dir_all(dir.join("sub")).unwrap();
+        write_file(&dir.join("sub"), "b.txt", "Preamp: -3 dB");
+        let mut loader = test_loader();
+        loader.config_path = dir.to_string_lossy().into_owned();
+        device_files::update_device(
+            &dir,
+            &loader.device_guid.clone(),
+            &[
+                std::path::PathBuf::from("a.txt"),
+                std::path::PathBuf::from("sub\\b.txt"),
+            ],
+        )
+        .unwrap();
+        let files = loader.config_files("");
+        assert_eq!(
+            files,
+            vec![
+                dir.join("a.txt").to_string_lossy().into_owned(),
+                dir.join("sub").join("b.txt").to_string_lossy().into_owned(),
+            ],
+            "relative entries resolve against the configuration directory, in manifest order"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn manifest_skips_entries_that_are_not_on_disk() {
+        let dir = temp_dir("manifest_missing");
+        write_file(&dir, "a.txt", "Preamp: -2 dB");
+        let mut loader = test_loader();
+        loader.config_path = dir.to_string_lossy().into_owned();
+        device_files::update_device(
+            &dir,
+            &loader.device_guid.clone(),
+            &[
+                std::path::PathBuf::from("a.txt"),
+                std::path::PathBuf::from("gone.txt"),
+            ],
+        )
+        .unwrap();
+        assert_eq!(
+            loader.config_files(""),
+            vec![dir.join("a.txt").to_string_lossy().into_owned()]
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn other_device_or_no_manifest_keeps_config_txt() {
+        let dir = temp_dir("manifest_fallback");
+        write_file(&dir, "config.txt", "Preamp: -1 dB");
+        let mut loader = test_loader();
+        loader.config_path = dir.to_string_lossy().into_owned();
+        let default = dir.join("config.txt").to_string_lossy().into_owned();
+        assert_eq!(loader.config_files(""), vec![default.clone()]);
+
+        device_files::update_device(
+            &dir,
+            "{11111111-1111-1111-1111-111111111111}",
+            &[std::path::PathBuf::from("config.txt")],
+        )
+        .unwrap();
+        assert_eq!(
+            loader.config_files(""),
+            vec![default.clone()],
+            "a manifest without an entry for this endpoint must not change anything"
+        );
+
+        loader.device_guid = String::new();
+        assert_eq!(loader.config_files(""), vec![default]);
+        assert_eq!(loader.config_files("D:\\other.txt"), vec!["D:\\other.txt".to_string()]);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

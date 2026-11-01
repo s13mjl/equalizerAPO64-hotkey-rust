@@ -20,6 +20,7 @@ use std::sync::{Arc, OnceLock};
 
 use eapo_apo_info::{AbstractAPOInfo, DeviceAPOInfo};
 use eapo_common::channel_helper;
+use eapo_common::device_files;
 use eapo_editor_core::analysis::{AnalysisRequest, AnalysisResult, AnalysisThread, DeviceSnapshot};
 use eapo_editor_core::calibration;
 use eapo_editor_core::config_file::{load_config_lines, save_config_file};
@@ -27,6 +28,7 @@ use eapo_editor_core::i18n;
 use eapo_editor_core::file_dialog::FileDialog;
 use eapo_editor_core::hotkey::HotkeyManager;
 use eapo_editor_core::keyseq::{KeyCode, KeySequence, Modifiers};
+use eapo_editor_core::live_files::{live_files, LiveMode};
 use eapo_editor_core::plot_math::PlotState;
 use eapo_editor_core::vst_editor;
 use eapo_editor_core::model::{
@@ -1720,12 +1722,19 @@ struct App {
     hover_pos: Option<(i32, i32)>,
     hot_rect: Option<RECT>,
     paint_offset: (i32, i32),
+    /// Which of the open documents the audio engine should follow.
+    live_mode: LiveMode,
+    /// Last manifest content published, with the device it belongs to, so an
+    /// unchanged list never rewrites the file (each write reloads the engine).
+    live_published: Option<(String, Vec<PathBuf>)>,
+    live_warning_shown: bool,
 }
 
 impl App {
     unsafe fn new(dpi: u32) -> Self {
         let prefs = GlobalPreferences::load();
         let instant_mode = prefs.instant_mode;
+        let live_mode = prefs.live_mode;
         let show_toolbar = prefs.show_toolbar;
         let recent_files = prefs.recent_files.clone();
         let analysis_resolution = prefs.analysis_resolution.max(128);
@@ -1813,6 +1822,9 @@ impl App {
             hover_pos: None,
             hot_rect: None,
             paint_offset: (0, 0),
+            live_mode,
+            live_published: None,
+            live_warning_shown: false,
         };
         app.create_fonts();
         let lines = if SCROLL_TEST.load(Ordering::Relaxed) {
@@ -1836,9 +1848,113 @@ impl App {
             selected: None,
             dirty: false,
         });
+        if live_mode != LiveMode::Off && !SCROLL_TEST.load(Ordering::Relaxed) {
+            // Adopt the list published by an earlier session, so the title marks
+            // the live document and a first switch does not rewrite it needlessly.
+            if let Some(device) = &app.selected_device {
+                let guid = device.get_device_guid();
+                let files =
+                    device_files::files_for(&settings::config_dir_from_registry(), &guid);
+                if !files.is_empty() {
+                    app.live_published = Some((guid, files));
+                }
+            }
+        }
         app.reload_hotkeys();
         app.start_analysis();
         app
+    }
+
+    /// The document of every tab. The frontmost tab comes from the live state
+    /// because `tabs` is only refreshed when a tab is captured.
+    fn tab_paths(&self) -> Vec<Option<PathBuf>> {
+        let mut paths: Vec<Option<PathBuf>> =
+            self.tabs.iter().map(|tab| tab.path.clone()).collect();
+        if let Some(slot) = paths.get_mut(self.active_tab) {
+            *slot = self.doc_path.clone();
+        }
+        paths
+    }
+
+    /// Publishes the files the audio engine should load for the selected
+    /// device, so switching tabs switches the live configuration. While live
+    /// mode is off the manifest is never touched, which keeps the original
+    /// "always read config.txt" behaviour.
+    unsafe fn publish_live_files(&mut self, hwnd: HWND) {
+        if SCROLL_TEST.load(Ordering::Relaxed) {
+            return;
+        }
+        let guid = match self.selected_device.as_ref() {
+            Some(device) => device.get_device_guid(),
+            None => return,
+        };
+        if guid.trim().is_empty() {
+            return;
+        }
+        let files = live_files(self.live_mode, &self.tab_paths(), self.active_tab);
+        if self
+            .live_published
+            .as_ref()
+            .is_some_and(|(last_guid, last_files)| {
+                *last_guid == guid && *last_files == files
+            })
+        {
+            return;
+        }
+        let config_dir = settings::config_dir_from_registry();
+        match device_files::update_device(&config_dir, &guid, &files) {
+            Ok(_) => {
+                self.live_published = Some((guid, files));
+                self.update_title(hwnd);
+            }
+            Err(error) => {
+                if !self.live_warning_shown {
+                    self.live_warning_shown = true;
+                    let text = wide_z(&format!(
+                        "{}: {} ({error})",
+                        i18n::tr("Could not update the live configuration list"),
+                        config_dir.display()
+                    ));
+                    let _ = MessageBoxW(
+                        Some(hwnd),
+                        PCWSTR(text.as_ptr()),
+                        w!("Equalizer APO"),
+                        MB_ICONWARNING,
+                    );
+                }
+            }
+        }
+    }
+
+    /// Stops following the editor for the selected device: the device goes back
+    /// to the configuration file the engine reads by default.
+    unsafe fn clear_live_files(&mut self) {
+        let guid = match self.selected_device.as_ref() {
+            Some(device) => device.get_device_guid(),
+            None => return,
+        };
+        if guid.trim().is_empty() {
+            return;
+        }
+        let config_dir = settings::config_dir_from_registry();
+        let _ = device_files::remove_device(&config_dir, &guid);
+        self.live_published = None;
+    }
+
+    unsafe fn set_live_mode(&mut self, hwnd: HWND, mode: LiveMode) {
+        if mode == self.live_mode {
+            return;
+        }
+        self.live_mode = mode;
+        self.prefs.live_mode = mode;
+        self.prefs.save();
+        match mode {
+            LiveMode::Off => self.clear_live_files(),
+            _ => self.publish_live_files(hwnd),
+        }
+        self.sync_live_menu(hwnd);
+        self.update_title(hwnd);
+        let _ = InvalidateRect(Some(hwnd), None, false);
     }
 
     fn reload_hotkeys(&mut self) {
@@ -2001,6 +2117,7 @@ impl App {
         self.update_scrollbar(hwnd);
         self.update_title(hwnd);
         self.start_analysis();
+        self.publish_live_files(hwnd);
         let _ = InvalidateRect(Some(hwnd), None, false);
     }
 
@@ -2417,7 +2534,16 @@ impl App {
             .map(|name| name.to_string_lossy().into_owned())
             .unwrap_or_else(|| "Unsaved".to_string());
         let suffix = if self.dirty { " *" } else { "" };
-        let title = wide_z(&format!("Equalizer APO Configuration Editor - {name}{suffix}"));
+        // Mark the document the audio engine currently follows for this device.
+        let live = self.live_mode != LiveMode::Off
+            && self
+                .doc_path
+                .as_ref()
+                .is_some_and(|path| self.live_published.as_ref().is_some_and(|(_, files)| files.contains(path)));
+        let live_mark = if live { " [live]" } else { "" };
+        let title = wide_z(&format!(
+            "Equalizer APO Configuration Editor - {name}{suffix}{live_mark}"
+        ));
         let _ = SetWindowTextW(hwnd, PCWSTR(title.as_ptr()));
     }
 
@@ -2434,6 +2560,7 @@ impl App {
                 self.capture_active_tab();
                 self.update_title(hwnd);
                 self.start_analysis();
+                self.publish_live_files(hwnd);
                 true
             }
             Err(error) => {
@@ -2488,6 +2615,11 @@ impl App {
         }
         self.skip_save_preferences = true;
         self.restart_after_close = true;
+        if !file_specific {
+            // The restart comes back with live mode off, so drop this device's
+            // manifest entry instead of leaving it applied behind the scenes.
+            self.clear_live_files();
+        }
         let _ = PostMessageW(Some(hwnd), WM_CLOSE, WPARAM(0), LPARAM(0));
     }
 
@@ -2502,9 +2634,28 @@ impl App {
         let _ = CheckMenuItem(view, 122, MF_BYCOMMAND.0 | checked(self.show_analysis));
     }
 
+    /// Keeps the live-configuration radio in the Settings menu in sync.
+    unsafe fn sync_live_menu(&self, hwnd: HWND) {
+        let settings = GetSubMenu(GetMenu(hwnd), 3);
+        if settings.0.is_null() {
+            return;
+        }
+        let checked = |mode: LiveMode| {
+            if self.live_mode == mode {
+                MF_CHECKED.0
+            } else {
+                MF_UNCHECKED.0
+            }
+        };
+        let _ = CheckMenuItem(settings, 130, MF_BYCOMMAND.0 | checked(LiveMode::Off));
+        let _ = CheckMenuItem(settings, 131, MF_BYCOMMAND.0 | checked(LiveMode::ActiveTab));
+        let _ = CheckMenuItem(settings, 132, MF_BYCOMMAND.0 | checked(LiveMode::AllTabs));
+    }
+
     unsafe fn save_preferences(&mut self, hwnd: HWND) {
         let mut prefs = self.prefs.clone();
         prefs.instant_mode = self.instant_mode;
+        prefs.live_mode = self.live_mode;
         prefs.show_toolbar = self.show_toolbar;
         prefs.show_analysis = self.show_analysis;
         prefs.recent_files = self.recent_files.clone();
@@ -3229,21 +3380,55 @@ impl App {
         let mut commands = Vec::new();
         let mut menu_texts: Vec<Vec<u16>> = Vec::new();
         for (index, device) in self.devices.iter().enumerate() {
-            let label = format!(
+            let mut label = format!(
                 "{}: {} - {}",
                 if device.is_input() { "Capture" } else { "Playback" },
                 device.get_connection_name(),
                 device.get_device_name()
             );
+            // Live configuration only has an audible effect where the APO is
+            // actually installed, so say which devices are not.
+            if !device.is_installed() {
+                label.push_str(&format!(" ({})", i18n::tr("APO not installed")));
+            }
             let id = 800 + index;
             let _ = AppendMenuW(menu, MF_STRING, id, menu_raw(&mut menu_texts, &label));
             commands.push((id, index));
         }
+        let _ = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null());
+        let radio = |on: bool| MF_STRING | if on { MF_CHECKED } else { MF_UNCHECKED };
+        let _ = AppendMenuW(
+            menu,
+            radio(self.live_mode == LiveMode::Off),
+            130,
+            menu_text(&mut menu_texts, "Live configuration: none (use config.txt)"),
+        );
+        let _ = AppendMenuW(
+            menu,
+            radio(self.live_mode == LiveMode::ActiveTab),
+            131,
+            menu_text(&mut menu_texts, "Live configuration: active tab"),
+        );
+        let _ = AppendMenuW(
+            menu,
+            radio(self.live_mode == LiveMode::AllTabs),
+            132,
+            menu_text(&mut menu_texts, "Live configuration: all open tabs"),
+        );
         let point = Self::screen_point(hwnd, x, y);
         let command = TrackPopupMenuEx(menu, TPM_RETURNCMD.0, point.x, point.y, hwnd, None).0 as usize;
         let _ = DestroyMenu(menu);
         if command == 0 {
             self.menu_guard = Some((1, std::time::Instant::now()));
+        }
+        if (130..=132).contains(&command) {
+            let mode = match command {
+                130 => LiveMode::Off,
+                131 => LiveMode::ActiveTab,
+                _ => LiveMode::AllTabs,
+            };
+            self.set_live_mode(hwnd, mode);
+            return;
         }
         let Some((_, index)) = commands.into_iter().find(|(id, _)| *id == command) else {
             return;
@@ -3264,6 +3449,7 @@ impl App {
             row.item = None;
         }
         self.start_analysis();
+        self.publish_live_files(hwnd);
         let _ = InvalidateRect(Some(hwnd), None, false);
     }
 
@@ -6610,6 +6796,7 @@ unsafe extern "system" fn main_window_proc(
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
             if let Some(state) = app(hwnd) {
                 state.update_title(hwnd);
+                state.sync_live_menu(hwnd);
                 SetTimer(Some(hwnd), TIMER_ANALYSIS, 100, None);
             }
             if SCROLL_TEST.load(Ordering::Relaxed) {
@@ -6904,6 +7091,14 @@ unsafe extern "system" fn main_window_proc(
                     125 => {
                         state.reset_preferences(hwnd, true);
                     }
+                    130 | 131 | 132 => {
+                        let mode = match id {
+                            130 => LiveMode::Off,
+                            131 => LiveMode::ActiveTab,
+                            _ => LiveMode::AllTabs,
+                        };
+                        state.set_live_mode(hwnd, mode);
+                    }
                     _ => {}
                 }
                 if (500..510).contains(&id) {
@@ -7117,6 +7312,25 @@ fn main() -> windows::core::Result<()> {
             MF_POPUP,
             language_menu.0 as usize,
             menu_text(&mut menu_texts, "Language"),
+        );
+        let _ = AppendMenuW(settings_menu, MF_SEPARATOR, 0, w!(""));
+        let _ = AppendMenuW(
+            settings_menu,
+            MF_STRING,
+            130,
+            menu_text(&mut menu_texts, "Live configuration: none (use config.txt)"),
+        );
+        let _ = AppendMenuW(
+            settings_menu,
+            MF_STRING,
+            131,
+            menu_text(&mut menu_texts, "Live configuration: active tab"),
+        );
+        let _ = AppendMenuW(
+            settings_menu,
+            MF_STRING,
+            132,
+            menu_text(&mut menu_texts, "Live configuration: all open tabs"),
         );
         let _ = AppendMenuW(settings_menu, MF_SEPARATOR, 0, w!(""));
         let _ = AppendMenuW(

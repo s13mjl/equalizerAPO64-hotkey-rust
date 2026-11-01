@@ -4,6 +4,7 @@ use std::path::Path;
 
 use serde_json::Value as JsonValue;
 
+use crate::live_files::LiveMode;
 use crate::model::FilterItem;
 
 pub const EDITOR_REGPATH: &str = r"HKEY_CURRENT_USER\SOFTWARE\EqualizerAPO\Configuration Editor";
@@ -69,6 +70,7 @@ pub struct GlobalPreferences {
     pub language: Option<String>,
     pub show_toolbar: bool,
     pub show_analysis: bool,
+    pub live_mode: LiveMode,
 }
 
 impl Default for GlobalPreferences {
@@ -90,6 +92,7 @@ impl Default for GlobalPreferences {
             language: None,
             show_toolbar: true,
             show_analysis: true,
+            live_mode: LiveMode::ActiveTab,
         }
     }
 }
@@ -111,6 +114,12 @@ impl GlobalPreferences {
         p.language = eapo_common::registry_helper::read_value(EDITOR_REGPATH, "language").ok();
         p.show_toolbar = read_bool(EDITOR_REGPATH, "showToolbar", true);
         p.show_analysis = read_bool(EDITOR_REGPATH, "showAnalysisPanel", true);
+        // Following the frontmost tab is the default, so an absent value must
+        // not turn the feature off.
+        p.live_mode = eapo_common::registry_helper::read_value(EDITOR_REGPATH, "liveConfigMode")
+            .ok()
+            .and_then(|text| LiveMode::parse(&text))
+            .unwrap_or(LiveMode::ActiveTab);
         if let Ok(text) = eapo_common::registry_helper::read_value(EDITOR_REGPATH, "windowSize") {
             if let Some((w, h)) = text.split_once('x') {
                 if let (Ok(w), Ok(h)) = (w.parse(), h.parse()) {
@@ -150,6 +159,11 @@ impl GlobalPreferences {
         }
         write_bool(EDITOR_REGPATH, "showToolbar", self.show_toolbar);
         write_bool(EDITOR_REGPATH, "showAnalysisPanel", self.show_analysis);
+        let _ = eapo_common::registry_helper::write_value(
+            EDITOR_REGPATH,
+            "liveConfigMode",
+            self.live_mode.as_str(),
+        );
         if let Some(lang) = &self.language {
             let _ = eapo_common::registry_helper::write_value(EDITOR_REGPATH, "language", lang);
         } else {
@@ -166,7 +180,7 @@ impl GlobalPreferences {
             }
         }
         // Also remove child values of the root key, keeping file-specific.
-        for name in ["instantMode", "selectedDevice", "selectedChannelMask", "openFiles", "tabIndex", "recentFiles", "windowSize", "windowPos", "language", "geometry", "windowState", "showToolbar", "showAnalysisPanel"] {
+        for name in ["instantMode", "selectedDevice", "selectedChannelMask", "openFiles", "tabIndex", "recentFiles", "windowSize", "windowPos", "language", "geometry", "windowState", "showToolbar", "showAnalysisPanel", "liveConfigMode", "liveMode"] {
             let _ = eapo_common::registry_helper::delete_value(EDITOR_REGPATH, name);
         }
     }

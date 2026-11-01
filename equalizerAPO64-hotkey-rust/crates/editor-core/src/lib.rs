@@ -7,6 +7,7 @@ pub mod file_dialog;
 pub mod hotkey;
 pub mod i18n;
 pub mod keyseq;
+pub mod live_files;
 pub mod model;
 pub mod plot_math;
 pub mod settings;

@@ -101,6 +101,41 @@ installation and removes it afterwards.
 Hotkeys are stored under
 `HKCU\Software\EqualizerAPO\Hotkeys\<filterId>\keySequence`.
 
+### Per-device live configuration files
+
+By default the APO loads a single file, `<ConfigPath>\config.txt`, exactly like
+the original. The Editor makes a device follow the documents that are open in
+its tabs out of the box; the same three modes are available in the **Settings**
+menu and at the bottom of the **Device** menu:
+
+| Mode | Effect |
+| --- | --- |
+| active tab | **Default.** The frontmost saved tab becomes the device's configuration, so switching tabs switches presets. |
+| all open tabs | Every saved tab is loaded, stacked in tab order. |
+| none (use config.txt) | The Editor never writes the manifest and `config.txt` is loaded. |
+
+The choice is published to `<ConfigPath>\device-files.cfg`:
+
+```text
+# Equalizer APO - live configuration files per device.
+[{4829078d-b25f-4c4b-b06a-f8b5bc97d5fd}]
+zmq.txt
+D:\configs\bass.txt
+```
+
+A section header is an endpoint GUID and the lines below it are configuration
+files in load order; relative paths resolve against the configuration directory
+(the Editor always writes absolute paths, hand-written relative ones work just
+as well).
+The manifest lives next to the configuration files because the installer grants
+the Users group full access to that directory, so writing it never needs
+elevation, and the directory watcher that already reloads `config.txt` picks the
+list up immediately. Editing it by hand is fine. Removing a device's section (or
+switching the mode back to *none*) restores the default behaviour, and every
+device keeps its own section, so different devices can follow different files at
+the same time. `Include:` inside each file still works, which is how a preset can
+be built out of several files.
+
 ## Implementation notes
 
 The original C++ uses a WDK `CBaseAudioProcessingObject`. The Rust APO

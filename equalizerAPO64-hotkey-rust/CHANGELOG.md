@@ -3,6 +3,31 @@
 All notable changes to this project are documented here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+- The built executables carried the generic Windows icon. Each one now embeds
+  the icon of its C++ counterpart (`Editor.ico`, `DeviceSelector.ico`,
+  `UpdateChecker.ico`, copied from the original project into `assets/icons/`),
+  through a new build-dependency crate `crates/winicon` that drives the SDK
+  `rc.exe` and passes the resulting `.res` to the linker. `VoicemeeterClient`,
+  `Benchmark` and `Setup` are unchanged because the original project defines no
+  icon for them.
+
+### Added
+- Per-device live configuration files. The native editor publishes the selected
+  endpoint's file list to `<ConfigPath>\device-files.cfg` and the engine loads
+  those files in order instead of `config.txt`. Following the frontmost tab is
+  on by default — opening a second document and switching to it switches the
+  live configuration, no menu needed; Settings/Device menus also offer
+  *stack all open tabs* and *none (use config.txt)*. The manifest lives in the
+  configuration directory (which the installer already grants to Users), so
+  switching presets needs no elevation and is picked up by the existing reload
+  watcher. Without a manifest entry the engine behaviour is byte-for-byte the
+  original `config.txt` loading. New `crates/common/src/device_files.rs`
+  (format) and `crates/editor-core/src/live_files.rs` (which tabs count), with
+  tests.
+
 ## [1.4.2-r2] - 2026-10-30
 
 Native Win32 editor refresh. Configuration format, registry layout and filter
