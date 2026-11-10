@@ -54,7 +54,7 @@ use windows::Win32::Graphics::Gdi::{
     SelectObject,
     SetBkMode, SetDCBrushColor, SetTextColor, SetViewportOrgEx, ScreenToClient, TextOutW,
     UpdateWindow, CLEARTYPE_QUALITY,
-    CLIP_DEFAULT_PRECIS, DC_BRUSH, DEFAULT_CHARSET, DEFAULT_GUI_FONT, DEFAULT_PITCH,
+    CLIP_DEFAULT_PRECIS, DC_BRUSH, DEFAULT_CHARSET, DEFAULT_PITCH,
     MONITOR_DEFAULTTONULL,
     OUT_DEFAULT_PRECIS, PAINTSTRUCT, PS_SOLID, Polyline, SRCCOPY, TRANSPARENT,
 };
@@ -6400,6 +6400,8 @@ struct PromptState {
     edit: HWND,
     initial: String,
     result: Rc<RefCell<Option<String>>>,
+    dpi: u32,
+    font: HFONT,
 }
 
 static PROMPT_CLASS: OnceLock<()> = OnceLock::new();
@@ -6450,7 +6452,8 @@ unsafe extern "system" fn prompt_wndproc(
             };
             let mut client = RECT::default();
             let _ = GetClientRect(hwnd, &mut client);
-            let width = (client.right - scale(24, 96)).max(scale(120, 96));
+            let dpi = state.dpi;
+            let width = (client.right - scale(24, dpi)).max(scale(120, dpi));
             let initial = wide_z(&state.initial);
             let edit = CreateWindowExW(
                 WINDOW_EX_STYLE(0),
@@ -6459,10 +6462,10 @@ unsafe extern "system" fn prompt_wndproc(
                 WINDOW_STYLE(
                     WS_CHILD.0 | WS_VISIBLE.0 | WS_BORDER.0 | ES_AUTOHSCROLL as u32,
                 ),
-                scale(12, 96),
-                scale(36, 96),
+                scale(12, dpi),
+                scale(36, dpi),
                 width,
-                scale(24, 96),
+                scale(24, dpi),
                 Some(hwnd),
                 None,
                 None,
@@ -6472,7 +6475,7 @@ unsafe extern "system" fn prompt_wndproc(
                 SendMessageW(
                     edit,
                     WM_SETFONT,
-                    Some(WPARAM(GetStockObject(DEFAULT_GUI_FONT).0 as usize)),
+                    Some(WPARAM(state.font.0 as usize)),
                     Some(LPARAM(1)),
                 );
                 let previous =
@@ -6489,18 +6492,22 @@ unsafe extern "system" fn prompt_wndproc(
             let mut client = RECT::default();
             let _ = GetClientRect(hwnd, &mut client);
             fill(hdc, 0, 0, client.right, client.bottom, WHITE);
-            SelectObject(hdc, GetStockObject(DEFAULT_GUI_FONT));
+            let state = (GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut PromptState).as_mut();
+            let dpi = state.as_ref().map(|state| state.dpi).unwrap_or(96);
+            if let Some(state) = state {
+                SelectObject(hdc, HGDIOBJ(state.font.0));
+            }
             draw_text(
                 hdc,
-                scale(12, 96),
-                scale(12, 96),
+                scale(12, dpi),
+                scale(12, dpi),
                 &wide("Enter a key sequence, e.g. Ctrl+Alt+X:"),
                 TEXT,
             );
             draw_text(
                 hdc,
-                scale(12, 96),
-                client.bottom - scale(22, 96),
+                scale(12, dpi),
+                client.bottom - scale(22, dpi),
                 &wide("Enter = OK, Esc = Cancel"),
                 MUTED,
             );
@@ -6528,6 +6535,11 @@ unsafe extern "system" fn prompt_wndproc(
         }
         WM_NCDESTROY => {
             let pointer = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut PromptState;
+            if let Some(state) = pointer.as_mut() {
+                if !state.font.is_invalid() {
+                    let _ = DeleteObject(HGDIOBJ(state.font.0));
+                }
+            }
             if !pointer.is_null() {
                 drop(Box::from_raw(pointer));
                 let _ = SetWindowLongPtrW(hwnd, GWLP_USERDATA, 0);
@@ -6559,10 +6571,27 @@ unsafe fn prompt_text(parent: HWND, title: &str, initial: &str) -> Option<String
     });
     let name = wide_z("EapoPromptDialog");
     let title = wide_z(title);
+    let dpi = GetDpiForWindow(parent).max(96);
+    let font = CreateFontW(
+        -((9 * dpi as i32 + 36) / 72),
+        0,
+        0,
+        0,
+        400,
+        0,
+        0,
+        0,
+        DEFAULT_CHARSET,
+        OUT_DEFAULT_PRECIS,
+        CLIP_DEFAULT_PRECIS,
+        CLEARTYPE_QUALITY,
+        DEFAULT_PITCH.0 as u32,
+        w!("Segoe UI"),
+    );
     let mut parent_rect = RECT::default();
     let _ = GetWindowRect(parent, &mut parent_rect);
-    let width = 520;
-    let height = 130;
+    let width = scale(520, dpi);
+    let height = scale(130, dpi);
     let x = parent_rect.left + ((parent_rect.right - parent_rect.left) - width) / 2;
     let y = parent_rect.top + ((parent_rect.bottom - parent_rect.top) - height) / 2;
     let result = Rc::new(RefCell::new(None));
@@ -6570,6 +6599,8 @@ unsafe fn prompt_text(parent: HWND, title: &str, initial: &str) -> Option<String
         edit: HWND::default(),
         initial: initial.to_string(),
         result: result.clone(),
+        dpi,
+        font,
     });
     let dialog = CreateWindowExW(
         WINDOW_EX_STYLE(0),
@@ -6608,6 +6639,8 @@ struct HotkeyPromptState {
     edit: HWND,
     sequence: Option<KeySequence>,
     result: Rc<RefCell<Option<Option<KeySequence>>>>,
+    dpi: u32,
+    font: HFONT,
 }
 
 static HOTKEY_PROMPT_CLASS: OnceLock<()> = OnceLock::new();
@@ -6626,6 +6659,10 @@ unsafe fn handle_hotkey_key(dialog: HWND, edit: HWND, vk: u32) {
     if !has_modifier {
         match vk {
             0x1B => {
+                // Hand activation back before destroying, like the OK/Cancel paths.
+                if let Ok(parent) = GetParent(dialog) {
+                    let _ = EnableWindow(parent, true);
+                }
                 let _ = DestroyWindow(dialog);
                 return;
             }
@@ -6744,6 +6781,7 @@ unsafe extern "system" fn hotkey_prompt_wndproc(
             };
             let mut client = RECT::default();
             let _ = GetClientRect(hwnd, &mut client);
+            let dpi = state.dpi;
             let initial = state
                 .sequence
                 .map(|sequence| sequence.to_string_qt())
@@ -6756,10 +6794,10 @@ unsafe extern "system" fn hotkey_prompt_wndproc(
                 WINDOW_STYLE(
                     WS_CHILD.0 | WS_VISIBLE.0 | WS_BORDER.0 | ES_AUTOHSCROLL as u32,
                 ),
-                scale(12, 96),
-                scale(36, 96),
-                (client.right - scale(24, 96)).max(scale(120, 96)),
-                scale(24, 96),
+                scale(12, dpi),
+                scale(36, dpi),
+                (client.right - scale(24, dpi)).max(scale(120, dpi)),
+                scale(24, dpi),
                 Some(hwnd),
                 None,
                 None,
@@ -6769,7 +6807,7 @@ unsafe extern "system" fn hotkey_prompt_wndproc(
                 SendMessageW(
                     edit,
                     WM_SETFONT,
-                    Some(WPARAM(GetStockObject(DEFAULT_GUI_FONT).0 as usize)),
+                    Some(WPARAM(state.font.0 as usize)),
                     Some(LPARAM(1)),
                 );
                 state.edit = edit;
@@ -6783,17 +6821,17 @@ unsafe extern "system" fn hotkey_prompt_wndproc(
                     PCWSTR(text.as_ptr()),
                     WINDOW_STYLE(WS_CHILD.0 | WS_VISIBLE.0 | WS_TABSTOP.0 | style),
                     x,
-                    scale(72, 96),
-                    scale(80, 96),
-                    scale(26, 96),
+                    scale(72, dpi),
+                    scale(80, dpi),
+                    scale(26, dpi),
                     Some(hwnd),
                     Some(HMENU(id as *mut core::ffi::c_void)),
                     None,
                     None,
                 );
             };
-            make_button("OK", client.right - scale(190, 96), 1, 0x0000_0001);
-            make_button("Cancel", client.right - scale(100, 96), 2, 0);
+            make_button("OK", client.right - scale(190, dpi), 1, 0x0000_0001);
+            make_button("Cancel", client.right - scale(100, dpi), 2, 0);
             LRESULT(0)
         }
         WM_PAINT => {
@@ -6802,11 +6840,16 @@ unsafe extern "system" fn hotkey_prompt_wndproc(
             let mut client = RECT::default();
             let _ = GetClientRect(hwnd, &mut client);
             fill(hdc, 0, 0, client.right, client.bottom, WHITE);
-            SelectObject(hdc, GetStockObject(DEFAULT_GUI_FONT));
+            let state =
+                (GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut HotkeyPromptState).as_mut();
+            let dpi = state.as_ref().map(|state| state.dpi).unwrap_or(96);
+            if let Some(state) = state {
+                SelectObject(hdc, HGDIOBJ(state.font.0));
+            }
             draw_text(
                 hdc,
-                scale(12, 96),
-                scale(12, 96),
+                scale(12, dpi),
+                scale(12, dpi),
                 &trw("Press the desired key combination (Enter = OK, Esc = Cancel):"),
                 TEXT,
             );
@@ -6838,6 +6881,11 @@ unsafe extern "system" fn hotkey_prompt_wndproc(
         }
         WM_NCDESTROY => {
             let pointer = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut HotkeyPromptState;
+            if let Some(state) = pointer.as_mut() {
+                if !state.font.is_invalid() {
+                    let _ = DeleteObject(HGDIOBJ(state.font.0));
+                }
+            }
             if !pointer.is_null() {
                 drop(Box::from_raw(pointer));
                 let _ = SetWindowLongPtrW(hwnd, GWLP_USERDATA, 0);
@@ -6875,10 +6923,27 @@ unsafe fn prompt_hotkey(
     });
     let name = wide_z("EapoHotkeyPromptDialog");
     let title = wide_z(title);
+    let dpi = GetDpiForWindow(parent).max(96);
+    let font = CreateFontW(
+        -((9 * dpi as i32 + 36) / 72),
+        0,
+        0,
+        0,
+        400,
+        0,
+        0,
+        0,
+        DEFAULT_CHARSET,
+        OUT_DEFAULT_PRECIS,
+        CLIP_DEFAULT_PRECIS,
+        CLEARTYPE_QUALITY,
+        DEFAULT_PITCH.0 as u32,
+        w!("Segoe UI"),
+    );
     let mut parent_rect = RECT::default();
     let _ = GetWindowRect(parent, &mut parent_rect);
-    let width = 520;
-    let height = 150;
+    let width = scale(520, dpi);
+    let height = scale(150, dpi);
     let x = parent_rect.left + ((parent_rect.right - parent_rect.left) - width) / 2;
     let y = parent_rect.top + ((parent_rect.bottom - parent_rect.top) - height) / 2;
     let result = Rc::new(RefCell::new(None));
@@ -6886,6 +6951,8 @@ unsafe fn prompt_hotkey(
         edit: HWND::default(),
         sequence: initial,
         result: result.clone(),
+        dpi,
+        font,
     });
     let dialog = CreateWindowExW(
         WINDOW_EX_STYLE(0),
