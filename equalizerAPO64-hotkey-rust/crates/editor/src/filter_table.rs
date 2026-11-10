@@ -903,77 +903,7 @@ pub fn reorder_uids(ids: &mut Vec<u64>, selected: &HashSet<u64>, drop_row: usize
     None
 }
 
-pub fn save_config_file(path: &str, lines: &[String]) -> std::io::Result<()> {
-    let mut text = String::new();
-    for (i, line) in lines.iter().enumerate() {
-        if i != 0 {
-            text.push_str("\r\n");
-        }
-        text.push_str(line);
-    }
-    let bytes = text.into_bytes();
-
-    // Prefer an atomic replace; fall back to the in-place write when the
-    // reader holds the target without delete sharing.
-    let target = Path::new(path);
-    let parent = target.parent().unwrap_or_else(|| Path::new("."));
-    let name = target
-        .file_name()
-        .map(|name| name.to_string_lossy().into_owned())
-        .unwrap_or_else(|| "config".to_string());
-    let temp = parent.join(format!(".{name}.{}.tmp", std::process::id()));
-    if std::fs::write(&temp, &bytes).is_ok() {
-        if std::fs::rename(&temp, target).is_ok() {
-            return Ok(());
-        }
-        let _ = std::fs::remove_file(&temp);
-    }
-
-    let mut attempts = 0;
-    loop {
-        match std::fs::write(path, &bytes) {
-            Ok(()) => return Ok(()),
-            Err(e) => {
-                let sharing = e.raw_os_error() == Some(32);
-                attempts += 1;
-                if !sharing || attempts > 200 {
-                    return Err(e);
-                }
-                std::thread::sleep(std::time::Duration::from_millis(10));
-            }
-        }
-    }
-}
-
-pub fn load_config_lines(path: &str) -> std::io::Result<Vec<String>> {
-    let mut attempts = 0;
-    let bytes = loop {
-        match std::fs::read(path) {
-            Ok(b) => break b,
-            Err(e) => {
-                let sharing = e.raw_os_error() == Some(32);
-                attempts += 1;
-                if !sharing || attempts > 200 {
-                    return Err(e);
-                }
-                std::thread::sleep(std::time::Duration::from_millis(10));
-            }
-        }
-    };
-    let text = match String::from_utf8(bytes) {
-        Ok(t) => t,
-        Err(e) => String::from_utf8_lossy(e.as_bytes()).into_owned(),
-    };
-    let text = text.strip_prefix('\u{feff}').unwrap_or(&text);
-    let mut lines = Vec::new();
-    for line in text.split('\n') {
-        lines.push(line.strip_suffix('\r').unwrap_or(line).to_string());
-    }
-    if lines.is_empty() {
-        lines.push(String::new());
-    }
-    Ok(lines)
-}
+pub use eapo_editor_core::config_file::{load_config_lines, save_config_file};
 
 pub fn file_title(path: &str) -> String {
     Path::new(path)

@@ -12,6 +12,7 @@ path = "src/main.rs"
 [dependencies]
 eapo-common = { workspace = true, features = ["gui"] }
 eapo-apo-info.workspace = true
+eapo-editor-core.workspace = true
 eapo-engine.workspace = true
 eapo-filters.workspace = true
 eapo-expression.workspace = true
