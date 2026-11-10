@@ -985,7 +985,7 @@ pub fn version_replaced_folder(existing: &str, version: &str) -> String {
     }
     static PATTERN: OnceLock<Regex> = OnceLock::new();
     let pattern = PATTERN.get_or_init(|| {
-        Regex::new(r"Equalizer APO [0-9]+\.[0-9]+(?:\.[0-9]+)?").expect("valid regex")
+        Regex::new(r"^Equalizer APO [0-9]+\.[0-9]+(?:\.[0-9]+)?").expect("valid regex")
     });
     pattern
         .replace_all(existing, format!("Equalizer APO {version}"))
