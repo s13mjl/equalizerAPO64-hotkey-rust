@@ -5,7 +5,9 @@
 //! with a real-input FFT and the maximum bin magnitude is reported as peak
 //! gain.  Timing values are measured the same way as the C++ implementation.
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use std::time::Instant;
 
@@ -80,14 +82,17 @@ pub struct AnalysisThread {
     request_tx: Option<Sender<AnalysisRequest>>,
     result_rx: Receiver<AnalysisResult>,
     join: Option<JoinHandle<()>>,
+    cancel: Arc<AtomicBool>,
 }
 
 impl AnalysisThread {
     pub fn new() -> Self {
         let (request_tx, request_rx) = mpsc::channel::<AnalysisRequest>();
         let (result_tx, result_rx) = mpsc::channel::<AnalysisResult>();
-        let join = thread::spawn(move || analysis_main(request_rx, result_tx));
-        Self { request_tx: Some(request_tx), result_rx, join: Some(join) }
+        let cancel = Arc::new(AtomicBool::new(false));
+        let worker_cancel = cancel.clone();
+        let join = thread::spawn(move || analysis_main(request_rx, result_tx, worker_cancel));
+        Self { request_tx: Some(request_tx), result_rx, join: Some(join), cancel }
     }
 
     pub fn set_parameters(&self, request: AnalysisRequest) {
@@ -109,6 +114,7 @@ impl Default for AnalysisThread {
 
 impl Drop for AnalysisThread {
     fn drop(&mut self) {
+        self.cancel.store(true, Ordering::Relaxed);
         self.request_tx.take();
         if let Some(t) = self.join.take() {
             let _ = t.join();
@@ -116,14 +122,22 @@ impl Drop for AnalysisThread {
     }
 }
 
-fn analysis_main(request_rx: Receiver<AnalysisRequest>, result_tx: Sender<AnalysisResult>) {
+fn analysis_main(
+    request_rx: Receiver<AnalysisRequest>,
+    result_tx: Sender<AnalysisResult>,
+    cancel: Arc<AtomicBool>,
+) {
     while let Ok(mut request) = request_rx.recv() {
         // Supersede queued requests; the newest parameters win, like the C++
         // `frameCount = 0` handshake.
         while let Ok(newer) = request_rx.try_recv() {
             request = newer;
         }
-        let result = run_analysis(&request);
+        cancel.store(false, Ordering::Relaxed);
+        let Some(result) = run_analysis_cancelled(&request, &cancel) else {
+            // The only cancellation source is the owning thread shutting down.
+            break;
+        };
         if result_tx.send(result).is_err() {
             break;
         }
@@ -131,6 +145,14 @@ fn analysis_main(request_rx: Receiver<AnalysisRequest>, result_tx: Sender<Analys
 }
 
 pub fn run_analysis(request: &AnalysisRequest) -> AnalysisResult {
+    run_analysis_cancelled(request, &AtomicBool::new(false))
+        .expect("analysis without cancellation always completes")
+}
+
+fn run_analysis_cancelled(
+    request: &AnalysisRequest,
+    cancel: &AtomicBool,
+) -> Option<AnalysisResult> {
     let device = &request.device;
 
     let mut channel_count = device.channel_count;
@@ -184,6 +206,9 @@ pub fn run_analysis(request: &AnalysisRequest) -> AnalysisResult {
 
     // Stop searching for startFrame after 10 seconds of audio data.
     while processed_frames < 10 * sample_rate {
+        if cancel.load(Ordering::Relaxed) {
+            return None;
+        }
         let pstart = Instant::now();
         unsafe {
             engine.process_f64_interleaved(
@@ -204,6 +229,9 @@ pub fn run_analysis(request: &AnalysisRequest) -> AnalysisResult {
         }
 
         for i in 0..frame_count {
+            if i & 0x1FFF == 0 && cancel.load(Ordering::Relaxed) {
+                return None;
+            }
             if output[i * channel_count as usize + channel_index].abs() > 1e-5 {
                 start_frame = i as i64;
                 break;
@@ -231,6 +259,9 @@ pub fn run_analysis(request: &AnalysisRequest) -> AnalysisResult {
 
     let peak_gain;
     if start_frame != -1 {
+        if cancel.load(Ordering::Relaxed) {
+            return None;
+        }
         latency += start_frame as i32;
         let mut buffer: Vec<Complex<f64>> =
             time_data.iter().map(|&v| Complex::new(v, 0.0)).collect();
@@ -252,7 +283,7 @@ pub fn run_analysis(request: &AnalysisRequest) -> AnalysisResult {
         peak_gain = f64::NEG_INFINITY;
     }
 
-    AnalysisResult {
+    Some(AnalysisResult {
         freq_data,
         freq_data_length: frame_count,
         freq_data_sample_rate: sample_rate,
@@ -262,7 +293,7 @@ pub fn run_analysis(request: &AnalysisRequest) -> AnalysisResult {
         processing_time,
         processed_frames,
         generation: request.generation,
-    }
+    })
 }
 
 #[cfg(test)]
