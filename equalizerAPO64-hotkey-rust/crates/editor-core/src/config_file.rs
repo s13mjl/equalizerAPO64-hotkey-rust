@@ -76,3 +76,31 @@ pub fn load_config_lines(path: &str) -> std::io::Result<Vec<String>> {
     }
     Ok(lines)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn saves_crlf_and_strips_bom_on_load() {
+        let path = std::env::temp_dir().join(format!(
+            "eapo_config_file_test_{}.txt",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_file(&path);
+        let lines = vec![
+            "Preamp: -6 dB".to_string(),
+            "Filter: ON PK Fc 100 Hz Gain 3 dB Q 1".to_string(),
+        ];
+        save_config_file(path.to_string_lossy().as_ref(), &lines).unwrap();
+        assert_eq!(
+            std::fs::read(&path).unwrap(),
+            b"Preamp: -6 dB\r\nFilter: ON PK Fc 100 Hz Gain 3 dB Q 1"
+        );
+
+        std::fs::write(&path, b"\xef\xbb\xbfPreamp: 0 dB").unwrap();
+        let loaded = load_config_lines(path.to_string_lossy().as_ref()).unwrap();
+        assert_eq!(loaded, vec!["Preamp: 0 dB".to_string()]);
+        let _ = std::fs::remove_file(&path);
+    }
+}
