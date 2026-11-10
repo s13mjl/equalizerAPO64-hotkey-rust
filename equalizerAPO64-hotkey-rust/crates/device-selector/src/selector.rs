@@ -683,7 +683,7 @@ CAUTION: Some sound card drivers can produce unwanted sounds when this is enable
                             device_updated = true;
                         }
                     }
-                    Err(error) => errors.push(error.to_string()),
+                    Err(error) => errors.push(format!("{}: {}", info.get_device_name(), error)),
                 }
             }
             let _ = VoicemeeterAPOInfo::ensure_voicemeeter_client_running();

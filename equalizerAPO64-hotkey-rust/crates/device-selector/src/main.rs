@@ -114,7 +114,11 @@ fn main() {
                     for info in infos {
                         if info.is_installed() {
                             if let Err(error) = info.uninstall() {
-                                show_error_message(&error.to_string());
+                                show_error_message(&format!(
+                                    "{}: {}",
+                                    info.get_device_name(),
+                                    error
+                                ));
                                 result = -1;
                             }
                         }
