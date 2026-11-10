@@ -101,8 +101,10 @@ impl Default for GlobalPreferences {
 
 impl GlobalPreferences {
     pub fn load() -> Self {
-        let mut p = Self::default();
-        p.instant_mode = read_bool(EDITOR_REGPATH, "instantMode", true);
+        let mut p = Self {
+            instant_mode: read_bool(EDITOR_REGPATH, "instantMode", true),
+            ..Self::default()
+        };
         p.selected_device = eapo_common::registry_helper::read_value(EDITOR_REGPATH, "selectedDevice").unwrap_or_default();
         p.selected_channel_mask = read_int(EDITOR_REGPATH, "selectedChannelMask", 0);
         p.analysis_start_from = read_int(ANALYSIS_REGPATH, "startFrom", 0);

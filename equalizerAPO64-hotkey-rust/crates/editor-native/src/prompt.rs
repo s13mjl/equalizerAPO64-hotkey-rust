@@ -317,8 +317,8 @@ fn reserved_hotkey(sequence: &KeySequence) -> bool {
     if modifiers.meta {
         return true;
     }
-    if modifiers.alt {
-        if matches!(
+    if modifiers.alt
+        && matches!(
             sequence.key,
             KeyCode::Function(4)
                 | KeyCode::Function(7)
@@ -329,9 +329,9 @@ fn reserved_hotkey(sequence: &KeySequence) -> bool {
                 | KeyCode::Tab
                 | KeyCode::Escape
                 | KeyCode::Print
-        ) {
-            return true;
-        }
+        )
+    {
+        return true;
     }
     if modifiers.ctrl && !modifiers.alt && matches!(sequence.key, KeyCode::Escape) {
         return true;
@@ -469,7 +469,7 @@ unsafe extern "system" fn hotkey_prompt_wndproc(
             LRESULT(0)
         }
         WM_COMMAND => {
-            let id = (wparam.0 & 0xFFFF) as usize;
+            let id = wparam.0 & 0xFFFF;
             if id == 1 {
                 accept_hotkey_dialog(hwnd);
             } else if id == IDCANCEL.0 as usize {
@@ -606,7 +606,7 @@ pub(super) unsafe fn prompt_hotkey(
         if message.hwnd == edit && matches!(message.message, WM_CHAR | WM_SYSCHAR) {
             continue;
         }
-        if !IsDialogMessageW(dialog, &mut message).as_bool() {
+        if !IsDialogMessageW(dialog, &message).as_bool() {
             let _ = TranslateMessage(&message);
             DispatchMessageW(&message);
         }

@@ -228,7 +228,7 @@ impl App {
         let rebuild = self
             .analysis_curve
             .as_ref()
-            .map_or(true, |curve| curve.key != curve_key);
+            .is_none_or(|curve| curve.key != curve_key);
         if rebuild {
             let sample_rate = result.freq_data_sample_rate.max(1) as f64;
             let bins = result.freq_data.len().max(1);

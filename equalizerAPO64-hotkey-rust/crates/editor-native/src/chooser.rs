@@ -74,12 +74,12 @@ fn scale(px: i32, dpi: u32) -> i32 {
 }
 
 fn column_count(items: usize) -> i32 {
-    (((items + 17) / 18).clamp(1, 3)) as i32
+    (items.div_ceil(18).clamp(1, 3)) as i32
 }
 
 fn row_count(items: usize, columns: i32) -> i32 {
     let columns = columns.max(1) as usize;
-    ((items + columns - 1) / columns) as i32
+    items.div_ceil(columns) as i32
 }
 
 /// Chooses columns/rows so the dialog fits the screen height where possible.
@@ -148,7 +148,7 @@ unsafe extern "system" fn chooser_proc(
             LRESULT(0)
         }
         WM_COMMAND => {
-            let id = (wparam.0 & 0xFFFF) as usize;
+            let id = wparam.0 & 0xFFFF;
             match id {
                 ID_OK => {
                     if let Some(state) = state_of(hwnd) {
@@ -457,7 +457,7 @@ pub unsafe fn check_list(
         if !GetMessageW(&mut message, None, 0, 0).as_bool() {
             break;
         }
-        if !IsDialogMessageW(dialog, &mut message).as_bool() {
+        if !IsDialogMessageW(dialog, &message).as_bool() {
             let _ = TranslateMessage(&message);
             DispatchMessageW(&message);
         }

@@ -329,7 +329,7 @@ pub(crate) unsafe extern "system" fn main_window_proc(
             LRESULT(0)
         }
         WM_COMMAND => {
-            let id = (wparam.0 & 0xFFFF) as usize;
+            let id = wparam.0 & 0xFFFF;
             if let Some(state) = app(hwnd) {
                 match id {
                     ID_EXIT => {
@@ -392,7 +392,7 @@ pub(crate) unsafe extern "system" fn main_window_proc(
                     125 => {
                         state.reset_preferences(hwnd, true);
                     }
-                    130 | 131 | 132 => {
+                    130..=132 => {
                         let mode = match id {
                             130 => LiveMode::Off,
                             131 => LiveMode::ActiveTab,

@@ -99,7 +99,7 @@ fn build_sounds() -> Option<SoundBank> {
 
 fn to_i16(sample: i32, bits: u32) -> i16 {
     match bits {
-        0..=15 => ((sample as i32) << (16 - bits)) as i16,
+        0..=15 => (sample << (16 - bits)) as i16,
         16 => sample as i16,
         _ => (sample >> (bits - 16)) as i16,
     }

@@ -193,8 +193,8 @@ fn run_analysis_cancelled(
     let mut input = vec![0.0f64; sample_count];
     let mut output = vec![0.0f64; sample_count];
     // C++: for (i = 0; i < channelCount; i++) buf[i] = 1.0f;
-    for i in 0..channel_count as usize {
-        input[i] = 1.0;
+    for value in input.iter_mut().take(channel_count as usize) {
+        *value = 1.0;
     }
 
     let mut time_data = vec![0.0f64; frame_count];

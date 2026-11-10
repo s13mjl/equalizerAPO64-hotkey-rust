@@ -46,7 +46,7 @@ pub fn live_files(mode: LiveMode, tab_paths: &[Option<PathBuf>], active: usize) 
     let candidates: Vec<PathBuf> = match mode {
         LiveMode::Off => return Vec::new(),
         LiveMode::ActiveTab => tab_paths.get(active).cloned().flatten().into_iter().collect(),
-        LiveMode::AllTabs => tab_paths.iter().cloned().flatten().collect(),
+        LiveMode::AllTabs => tab_paths.iter().flatten().cloned().collect(),
     };
     let mut seen = std::collections::HashSet::new();
     candidates

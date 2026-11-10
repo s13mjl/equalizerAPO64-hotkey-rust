@@ -264,7 +264,7 @@ impl Default for GraphicEqEditor {
             view_height: 150.0,
             zoom_x: 1.0,
             zoom_y: 1.0,
-            scroll: (290.5952109946698, 195.0),
+            scroll: (290.5952, 195.0),
         }
     }
 }

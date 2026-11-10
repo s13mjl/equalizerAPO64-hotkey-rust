@@ -267,7 +267,7 @@ impl GeqView {
 
 /// Picks a 1/2/5 dB grid step giving roughly 56 px spacing.
 pub(crate) fn db_grid_step(range: f64, height: i32) -> f64 {
-    if !(range > 0.0) || height <= 0 {
+    if !range.is_finite() || range <= 0.0 || height <= 0 {
         return 10.0;
     }
     let target = range * 56.0 / height as f64;
@@ -300,6 +300,7 @@ pub(crate) fn geq_gain_at(nodes: &[FilterNode], freq: f64) -> f64 {
     0.0
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) unsafe fn paint_graphic_eq_row(
     hdc: HDC,
     offset: (i32, i32),

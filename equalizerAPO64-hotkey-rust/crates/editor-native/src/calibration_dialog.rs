@@ -76,7 +76,7 @@ unsafe fn create_control(
     id: usize,
     font: HFONT,
 ) -> Option<HWND> {
-    let text = wide_z(&label);
+    let text = wide_z(label);
     let control = CreateWindowExW(
         WINDOW_EX_STYLE(0),
         class,
@@ -325,7 +325,7 @@ unsafe extern "system" fn cal_proc(
             LRESULT(0)
         }
         WM_COMMAND => {
-            let id = (wparam.0 & 0xFFFF) as usize;
+            let id = wparam.0 & 0xFFFF;
             match id {
                 ID_OK => {
                     if let Some(state) = state_of(hwnd) {
@@ -462,7 +462,7 @@ pub unsafe fn calibrate(parent: HWND, volume: f64) -> Option<i32> {
         if !GetMessageW(&mut message, None, 0, 0).as_bool() {
             break;
         }
-        if !IsDialogMessageW(dialog, &mut message).as_bool() {
+        if !IsDialogMessageW(dialog, &message).as_bool() {
             let _ = TranslateMessage(&message);
             DispatchMessageW(&message);
         }

@@ -45,7 +45,7 @@ struct HostState {
 }
 
 thread_local! {
-    static HOST_STATE: RefCell<HostState> = RefCell::new(HostState { apply: false, close: false });
+    static HOST_STATE: RefCell<HostState> = const { RefCell::new(HostState { apply: false, close: false }) };
 }
 
 unsafe extern "system" fn host_wnd_proc(
@@ -60,7 +60,7 @@ unsafe extern "system" fn host_wnd_proc(
             LRESULT(1)
         }
         WM_COMMAND => {
-            match (wparam.0 & 0xffff) as usize {
+            match wparam.0 & 0xffff {
                 ID_APPLY => HOST_STATE.with(|state| state.borrow_mut().apply = true),
                 ID_OK => HOST_STATE.with(|state| {
                     let mut state = state.borrow_mut();

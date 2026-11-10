@@ -824,7 +824,7 @@ unsafe extern "system" fn copy_proc(
             LRESULT(0)
         }
         WM_COMMAND => {
-            let id = (wparam.0 & 0xFFFF) as usize;
+            let id = wparam.0 & 0xFFFF;
             let code = ((wparam.0 >> 16) & 0xFFFF) as u32;
             match id {
                 ID_OK => {
@@ -874,7 +874,7 @@ unsafe extern "system" fn copy_proc(
                         if let Some(state) = state_of(hwnd) {
                             update_modes(state);
                         }
-                    } else if code == 0 && id >= ID_ROW_BASE && id < ID_MODE_BASE {
+                    } else if code == 0 && (ID_ROW_BASE..ID_MODE_BASE).contains(&id) {
                         if let Some(state) = state_of(hwnd) {
                             let index = id - ID_ROW_BASE;
                             let row = index / 2;
@@ -1104,7 +1104,7 @@ pub unsafe fn edit_copy(
         if !GetMessageW(&mut message, None, 0, 0).as_bool() {
             break;
         }
-        if !IsDialogMessageW(dialog, &mut message).as_bool() {
+        if !IsDialogMessageW(dialog, &message).as_bool() {
             let _ = TranslateMessage(&message);
             DispatchMessageW(&message);
         }
