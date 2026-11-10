@@ -2171,12 +2171,14 @@ impl App {
         if index == self.active_tab || index >= self.tabs.len() {
             return;
         }
+        self.commit_value_edit(hwnd, true);
         self.commit_edit(hwnd, true);
         self.capture_active_tab();
         self.load_tab(hwnd, index);
     }
 
     unsafe fn new_tab(&mut self, hwnd: HWND) {
+        self.commit_value_edit(hwnd, true);
         self.commit_edit(hwnd, true);
         self.capture_active_tab();
         let index = self.tabs.len();
@@ -2195,6 +2197,7 @@ impl App {
         if paths.is_empty() {
             return;
         }
+        self.commit_value_edit(hwnd, true);
         self.commit_edit(hwnd, true);
         self.capture_active_tab();
         let mut last = None;
@@ -2249,6 +2252,8 @@ impl App {
     }
 
     unsafe fn open_dialog(&mut self, hwnd: HWND) {
+        self.commit_value_edit(hwnd, true);
+        self.commit_edit(hwnd, true);
         let mut dialog = FileDialog::new()
             .set_title("Open configuration")
             .add_filter("E-APO configurations (*.txt)", &["txt"]);
@@ -2261,6 +2266,8 @@ impl App {
     }
 
     unsafe fn save_as(&mut self, hwnd: HWND) -> bool {
+        self.commit_value_edit(hwnd, true);
+        self.commit_edit(hwnd, true);
         let mut dialog = FileDialog::new()
             .set_title("Save configuration as")
             .add_filter("E-APO configurations (*.txt)", &["txt"]);
@@ -4213,6 +4220,7 @@ impl App {
         if index != self.active_tab {
             self.switch_tab(hwnd, index);
         }
+        self.commit_value_edit(hwnd, true);
         self.commit_edit(hwnd, true);
         self.capture_active_tab();
         if self.tabs[index].dirty {
