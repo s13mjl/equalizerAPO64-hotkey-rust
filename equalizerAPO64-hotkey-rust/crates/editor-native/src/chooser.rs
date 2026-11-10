@@ -100,6 +100,10 @@ unsafe fn refresh_enabled(hwnd: HWND) {
     let filter_on = state.filter.map(|filter| is_checked(filter)).unwrap_or(false);
     for (index, button) in state.buttons.iter().enumerate() {
         let keep = !filter_on || state.keep.get(index).copied().unwrap_or(true);
+        if filter_on && !keep {
+            // A hidden device must not stay selected and be submitted.
+            SendMessageW(*button, BM_SETCHECK, Some(WPARAM(0)), None);
+        }
         let _ = EnableWindow(*button, !all_on && keep);
     }
 }
