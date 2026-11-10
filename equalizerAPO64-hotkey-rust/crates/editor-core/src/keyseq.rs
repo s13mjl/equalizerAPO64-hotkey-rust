@@ -504,6 +504,17 @@ mod tests {
             "Ctrl+ScrollLock",
             "Ctrl+Pause",
             "Ctrl+Left",
+            "Ctrl+,",
+            "Ctrl+.",
+            "Ctrl+/",
+            "Ctrl+;",
+            "Ctrl+'",
+            "Ctrl+[",
+            "Ctrl+]",
+            "Ctrl+-",
+            "Ctrl+=",
+            "Ctrl+`",
+            "Ctrl+\\",
         ] {
             let seq = KeySequence::parse(text).unwrap_or_else(|| panic!("parse {text}"));
             assert_eq!(seq.to_string_qt(), text, "round trip {text}");
@@ -550,6 +561,17 @@ mod tests {
             "Ctrl+ScrollLock",
             "Ctrl+Pause",
             "Ctrl+Left",
+            "Ctrl+,",
+            "Ctrl+.",
+            "Ctrl+/",
+            "Ctrl+;",
+            "Ctrl+'",
+            "Ctrl+[",
+            "Ctrl+]",
+            "Ctrl+-",
+            "Ctrl+=",
+            "Ctrl+`",
+            "Ctrl+\\",
         ] {
             let seq = KeySequence::parse(text).unwrap();
             let (mods, vk) = seq.to_win();

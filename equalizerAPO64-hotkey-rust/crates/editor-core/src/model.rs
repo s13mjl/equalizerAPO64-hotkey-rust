@@ -1310,6 +1310,15 @@ mod tests {
     }
 
     #[test]
+    fn graphic_eq_accepts_mixed_decimal_commas() {
+        let ed = GraphicEqEditor::parse("1000,5 3.5; 2000 1,25").unwrap();
+        assert_eq!(ed.nodes[0].freq, 1000.5);
+        assert_eq!(ed.nodes[0].db_gain, 3.5);
+        assert_eq!(ed.nodes[1].freq, 2000.0);
+        assert_eq!(ed.nodes[1].db_gain, 1.25);
+    }
+
+    #[test]
     fn compose_matches_cpp_spacing() {
         assert_eq!(compose_line("  ", false, "Preamp", "-6 dB"), "  # Preamp: -6 dB");
         assert_eq!(compose_line("", true, "Copy", ""), "Copy: ");
