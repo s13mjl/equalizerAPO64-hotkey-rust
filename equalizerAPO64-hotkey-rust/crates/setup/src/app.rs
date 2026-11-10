@@ -271,7 +271,7 @@ impl SetupApp {
                 self.language().uninstall_failed().to_string()
             };
             self.log
-                .push("The worker thread terminated unexpectedly.".to_string());
+                .push(self.language().worker_terminated().to_string());
             self.outcome = Some(if self.is_installer() {
                 Outcome::Install(InstallResult::failed(message))
             } else {
@@ -356,7 +356,8 @@ impl SetupApp {
                 self.page = Page::Progress;
             }
             Err(error) => {
-                let message = format!("Could not start installer worker: {error}");
+                let message =
+                    format!("{}: {error}", self.language().worker_start_failed());
                 self.log.push(message.clone());
                 self.outcome = Some(Outcome::Install(InstallResult::failed(message)));
                 self.page = Page::Error;
@@ -397,7 +398,8 @@ impl SetupApp {
                 self.page = Page::UninstallProgress;
             }
             Err(error) => {
-                let message = format!("Could not start uninstaller worker: {error}");
+                let message =
+                    format!("{}: {error}", self.language().worker_start_failed());
                 self.log.push(message.clone());
                 self.outcome = Some(Outcome::Uninstall(UninstallResult::failed(message)));
                 self.page = Page::Error;
@@ -426,7 +428,8 @@ impl SetupApp {
         if self.page.is_progress() {
             self.cancel.store(true, Ordering::Relaxed);
             self.status = language.cancelling().to_string();
-            self.log.push("Cancellation requested.".to_string());
+            self.log
+                .push(self.language().cancellation_requested().to_string());
         } else {
             self.close_app(ctx);
         }

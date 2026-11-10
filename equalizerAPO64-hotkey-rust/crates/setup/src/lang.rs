@@ -187,6 +187,26 @@ impl Language {
         )
     }
 
+    pub fn worker_terminated(&self) -> &'static str {
+        tr!(
+            self,
+            "The worker thread terminated unexpectedly.",
+            "Der Worker-Thread wurde unerwartet beendet."
+        )
+    }
+
+    pub fn worker_start_failed(&self) -> &'static str {
+        tr!(
+            self,
+            "Could not start the setup worker.",
+            "Der Setup-Worker konnte nicht gestartet werden."
+        )
+    }
+
+    pub fn cancellation_requested(&self) -> &'static str {
+        tr!(self, "Cancellation requested.", "Abbruch angefordert.")
+    }
+
     pub fn start_menu_title(&self) -> &'static str {
         tr!(self, "Choose Start Menu Folder", "Startmenü-Ordner wählen")
     }
