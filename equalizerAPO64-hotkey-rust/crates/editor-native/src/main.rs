@@ -74,7 +74,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CallWindowProcW, CheckMenuItem, CreateMenu, CreatePopupMenu, CreateWindowExW,
     CREATESTRUCTW, DefWindowProcW, DestroyMenu, DestroyWindow, DispatchMessageW, GetClientRect,
     GetMenu, GetMessageW, GetParent, GetSubMenu, GetWindowLongPtrW, GetWindowPlacement,
-    GetWindowRect, GetWindowTextW, IsDialogMessageW, IsIconic, IsWindow, KillTimer, LoadCursorW,
+    GetWindowRect, GetWindowTextLengthW, GetWindowTextW, IsDialogMessageW, IsIconic, IsWindow, KillTimer, LoadCursorW,
     MessageBoxW, PostMessageW, PostQuitMessage, RegisterClassW, SendMessageW, SetTimer,
     SetWindowLongPtrW, SetWindowPos, SetWindowTextW, SetForegroundWindow, ShowWindow,
     TrackPopupMenuEx, TranslateMessage, CS_DBLCLKS, CS_HREDRAW, CS_VREDRAW, CW_USEDEFAULT, ES_AUTOHSCROLL,
@@ -2927,7 +2927,8 @@ impl App {
             return;
         };
         if apply {
-            let mut buffer = [0u16; 4096];
+            let capacity = GetWindowTextLengthW(edit.hwnd).max(0) as usize + 1;
+            let mut buffer = vec![0u16; capacity];
             let length = GetWindowTextW(edit.hwnd, &mut buffer).max(0) as usize;
             let text = String::from_utf16_lossy(&buffer[..length.min(buffer.len())]);
             if edit.row < self.rows.len() && self.rows[edit.row].line != text {
