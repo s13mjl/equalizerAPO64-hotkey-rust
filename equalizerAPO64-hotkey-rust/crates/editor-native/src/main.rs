@@ -2710,9 +2710,15 @@ impl App {
                 .as_ref()
                 .is_some_and(|path| self.live_published.as_ref().is_some_and(|(_, files)| files.contains(path)));
         let live_mark = if live { " [live]" } else { "" };
-        let title = wide_z(&format!(
-            "Equalizer APO Configuration Editor - {name}{suffix}{live_mark}"
-        ));
+        let title = format!("Equalizer APO Configuration Editor - {name}{suffix}{live_mark}");
+        let mut current = [0u16; 512];
+        let length = GetWindowTextW(hwnd, &mut current).max(0) as usize;
+        if length > 0
+            && String::from_utf16_lossy(&current[..length.min(current.len())]) == title
+        {
+            return;
+        }
+        let title = wide_z(&title);
         let _ = SetWindowTextW(hwnd, PCWSTR(title.as_ptr()));
     }
 
