@@ -144,11 +144,11 @@ impl DeviceTestThread {
         }
     }
 
-    pub fn start(mut self) {
+    pub fn start(mut self) -> std::thread::JoinHandle<()> {
         std::thread::spawn(move || {
             self.run();
             let _ = self.sender.send(TestEvent::Finished);
-        });
+        })
     }
 
     fn index_of(&self, guid: &str) -> Option<usize> {

@@ -45,6 +45,7 @@ pub struct DeviceTestDialog {
     item_map: HashMap<String, usize>,
     log_lines: Vec<LogLine>,
     thread_finished: bool,
+    thread: Option<std::thread::JoinHandle<()>>,
     sender: Sender<TestEvent>,
     receiver: Receiver<TestEvent>,
     cancel: Arc<AtomicBool>,
@@ -86,11 +87,13 @@ impl DeviceTestDialog {
             entries.iter().map(|entry| entry.info.clone()).collect();
         let idle = devices.is_empty();
         let thread = DeviceTestThread::new(devices, sender.clone(), cancel.clone());
-        if !idle {
+        let thread = if idle {
+            None
+        } else {
             // Restarting the audio service for an empty device list would be
             // pointless and would still interrupt playback.
-            thread.start();
-        }
+            Some(thread.start())
+        };
 
         Self {
             entries,
@@ -98,6 +101,7 @@ impl DeviceTestDialog {
             item_map,
             log_lines: Vec::new(),
             thread_finished: idle,
+            thread,
             sender,
             receiver,
             cancel,
@@ -289,9 +293,16 @@ impl DeviceTestDialog {
 impl Drop for DeviceTestDialog {
     fn drop(&mut self) {
         self.cancel.store(true, Ordering::Relaxed);
-        // The sender is kept alive by the thread; dropping the dialog leaves
-        // the thread running until it notices the cancel flag. The original
-        // called QThread::terminate() here, which has no safe Rust equivalent.
+        // Join from a helper thread: the worker may be inside an audio-service
+        // restart, and blocking the UI on close was the original complaint.
+        // This still reclaims the handle instead of detaching it forever.
+        if let Some(handle) = self.thread.take() {
+            let _ = std::thread::Builder::new()
+                .name("eapo-test-reaper".to_string())
+                .spawn(move || {
+                    let _ = handle.join();
+                });
+        }
         let _ = &self.sender;
     }
 }
