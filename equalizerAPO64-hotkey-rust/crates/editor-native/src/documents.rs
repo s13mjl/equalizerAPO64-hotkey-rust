@@ -261,7 +261,8 @@ impl App {
     pub(super) unsafe fn save(&mut self, hwnd: HWND) -> bool {
         if self.doc_path.is_none() {
             return self.save_as(hwnd);
-        }        let Some(path) = self.doc_path.clone() else {
+        }
+        let Some(path) = self.doc_path.clone() else {
             return false;
         };
         let lines: Vec<String> = self.rows.iter().map(|row| row.line.clone()).collect();
