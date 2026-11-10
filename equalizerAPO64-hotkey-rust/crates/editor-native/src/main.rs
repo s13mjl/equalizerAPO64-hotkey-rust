@@ -6791,12 +6791,11 @@ unsafe extern "system" fn prompt_wndproc(
         WM_APP_PROMPT_ACCEPT => {
             if let Some(state) = (GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut PromptState).as_mut()
             {
-                let mut buffer = [0u16; 512];
-                let length = GetWindowTextW(state.edit, &mut buffer).max(0) as usize;
+                let length = GetWindowTextLengthW(state.edit).max(0) as usize;
+                let mut buffer = vec![0u16; length + 1];
+                let read = GetWindowTextW(state.edit, &mut buffer).max(0) as usize;
                 *state.result.borrow_mut() = Some(
-                    String::from_utf16_lossy(&buffer[..length.min(buffer.len())])
-                        .trim()
-                        .to_string(),
+                    String::from_utf16_lossy(&buffer[..read]).trim().to_string(),
                 );
             }
             let _ = DestroyWindow(hwnd);

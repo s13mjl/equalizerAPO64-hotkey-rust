@@ -22,7 +22,7 @@ use windows::Win32::UI::HiDpi::GetDpiForWindow;
 use windows::Win32::UI::Input::KeyboardAndMouse::EnableWindow;
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetClientRect, GetMessageW,
-    GetParent, GetWindow, GetWindowLongPtrW, GetWindowRect, GetWindowTextW, IsDialogMessageW, IsWindow,
+    GetParent, GetWindow, GetWindowLongPtrW, GetWindowRect, GetWindowTextLengthW, GetWindowTextW, IsDialogMessageW, IsWindow,
     LoadCursorW, RegisterClassW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowPos,
     ShowWindow, TranslateMessage, CREATESTRUCTW, CS_HREDRAW, CS_VREDRAW,
     GWLP_USERDATA, GW_CHILD, GW_HWNDNEXT, IDC_ARROW, MSG, SB_BOTTOM, SB_LINEDOWN, SB_LINEUP,
@@ -122,7 +122,8 @@ unsafe fn state_of(hwnd: HWND) -> Option<&'static mut CopyState> {
 }
 
 unsafe fn get_text(hwnd: HWND) -> String {
-    let mut buffer = vec![0u16; 512];
+    let length = GetWindowTextLengthW(hwnd).max(0) as usize;
+    let mut buffer = vec![0u16; length + 1];
     let len = GetWindowTextW(hwnd, &mut buffer);
     String::from_utf16_lossy(&buffer[..len.max(0) as usize])
 }
