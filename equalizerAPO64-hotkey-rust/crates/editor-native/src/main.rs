@@ -3678,6 +3678,7 @@ impl App {
         for row in &mut self.rows {
             row.item = None;
         }
+        self.analysis_result = None;
         self.start_analysis();
         self.publish_live_files(hwnd);
         let _ = InvalidateRect(Some(hwnd), None, false);
@@ -3739,6 +3740,7 @@ impl App {
         for row in &mut self.rows {
             row.item = None;
         }
+        self.analysis_result = None;
         self.start_analysis();
         let _ = InvalidateRect(Some(hwnd), None, false);
     }
@@ -3823,6 +3825,7 @@ impl App {
             }
         }
         if changed {
+            self.analysis_result = None;
             self.start_analysis();
             let _ = InvalidateRect(Some(hwnd), None, false);
         }
