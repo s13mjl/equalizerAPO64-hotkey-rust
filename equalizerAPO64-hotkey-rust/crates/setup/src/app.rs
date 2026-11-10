@@ -469,7 +469,7 @@ impl SetupApp {
     fn primary_enabled(&self) -> bool {
         match self.page {
             Page::License => match &self.mode {
-                Mode::Install(data) => data.license_accepted,
+                Mode::Install(data) => data.license_accepted || self.license.is_empty(),
                 _ => true,
             },
             _ => true,
