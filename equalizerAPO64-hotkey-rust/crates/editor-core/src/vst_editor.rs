@@ -14,6 +14,7 @@ use eapo_filters::vst_plugin_library::VSTPluginLibrary;
 use windows::core::{w, HSTRING, PCWSTR};
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+use windows::Win32::UI::HiDpi::GetDpiForWindow;
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CreateMenu, CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW,
     SetForegroundWindow, SetMenu, SetWindowPos, ShowWindow,
@@ -114,6 +115,19 @@ fn create_host_window(title: &str) -> Option<HWND> {
             None,
         )
         .ok()?;
+
+        let dpi = GetDpiForWindow(hwnd).max(96);
+        let _ = SetWindowPos(
+            hwnd,
+            None,
+            0,
+            0,
+            (520 * dpi as i32 + 48) / 96,
+            (420 * dpi as i32 + 48) / 96,
+            windows::Win32::UI::WindowsAndMessaging::SWP_NOMOVE
+                | windows::Win32::UI::WindowsAndMessaging::SWP_NOZORDER
+                | windows::Win32::UI::WindowsAndMessaging::SWP_NOACTIVATE,
+        );
 
         if let Ok(menu) = CreateMenu() {
             let file = CreateMenu().ok();
@@ -221,13 +235,16 @@ pub fn open_plugin_editor(v: &mut VstEditor) -> bool {
     effect.start_editing(hwnd, &mut width, &mut height);
     if width > 0 && height > 0 {
         unsafe {
+            let dpi = GetDpiForWindow(hwnd).max(96) as i32;
+            let frame_width = (16 * dpi + 48) / 96;
+            let frame_height = (68 * dpi + 48) / 96;
             let _ = SetWindowPos(
                 hwnd,
                 None,
                 0,
                 0,
-                width as i32 + 16,
-                height as i32 + 68,
+                width as i32 + frame_width,
+                height as i32 + frame_height,
                 windows::Win32::UI::WindowsAndMessaging::SWP_NOMOVE,
             );
             let _ = ShowWindow(hwnd, SW_SHOW);
