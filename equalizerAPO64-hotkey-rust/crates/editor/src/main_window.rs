@@ -1275,8 +1275,10 @@ impl EditorApp {
                 for tab in &mut self.tabs {
                     if tab.item_by_filter_id(&filter_id).is_some() {
                         ok = tab.set_hotkey(&filter_id, result);
-                        tab.save_preferences();
-                        tab.mark_changed();
+                        if ok {
+                            tab.save_preferences();
+                            tab.mark_changed();
+                        }
                         break;
                     }
                 }
@@ -1285,8 +1287,9 @@ impl EditorApp {
                         title: "Hotkey".into(),
                         text: "The hotkey could not be registered. It may already be in use by another application.".into(),
                     });
+                } else if ok {
+                    self.maybe_save_active();
                 }
-                self.maybe_save_active();
             }
         }
     }

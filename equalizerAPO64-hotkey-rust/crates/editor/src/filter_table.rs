@@ -243,14 +243,23 @@ impl FilterTab {
 
     pub fn set_hotkey(&mut self, filter_id: &str, seq: Option<KeySequence>) -> bool {
         let Some(i) = self.item_by_filter_id(filter_id) else { return false };
+        let previous = self.items[i].hotkey;
         self.items[i].hotkey = seq;
         self.items[i].prefs.remove("hotkey");
         self.register_filter_hotkey(filter_id);
-        self.dirty = true;
-        match seq {
+        let ok = match seq {
             Some(_) => self.hotkeys.has_hotkey(filter_id),
             None => true,
+        };
+        if ok {
+            self.dirty = true;
+        } else {
+            // Registration failed: keep the previous assignment instead of
+            // showing a hotkey that never fires.
+            self.items[i].hotkey = previous;
+            self.register_filter_hotkey(filter_id);
         }
+        ok
     }
 
     pub fn poll_hotkeys(&mut self) -> Vec<String> {
