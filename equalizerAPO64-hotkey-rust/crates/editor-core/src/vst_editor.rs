@@ -263,12 +263,19 @@ pub fn open_plugin_editor(v: &mut VstEditor) -> bool {
                 let state = state.borrow();
                 (state.close, state.apply)
             });
-            if apply || v.auto_apply {
-                if apply || last_read.elapsed() >= std::time::Duration::from_millis(1000) {
-                    apply_effect_state(&effect, v);
-                    changed = true;
-                    last_read = std::time::Instant::now();
-                }
+            if apply {
+                apply_effect_state(&effect, v);
+                changed = true;
+                last_read = std::time::Instant::now();
+                // Consume the Apply request; otherwise the state would be read
+                // every 10 ms until the panel is closed.
+                HOST_STATE.with(|state| state.borrow_mut().apply = false);
+            } else if v.auto_apply
+                && last_read.elapsed() >= std::time::Duration::from_millis(1000)
+            {
+                apply_effect_state(&effect, v);
+                changed = true;
+                last_read = std::time::Instant::now();
             }
             if close {
                 if apply || v.auto_apply {
