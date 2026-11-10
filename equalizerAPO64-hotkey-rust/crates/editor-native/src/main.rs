@@ -1777,6 +1777,19 @@ impl App {
             .iter()
             .position(|name| name.eq_ignore_ascii_case(prefs.analysis_channel.trim()))
             .unwrap_or(0);
+        // A file that cannot be read must not keep its path in the tab: saving
+        // would otherwise overwrite the real configuration with the error row.
+        let (startup_lines, startup_path) = if SCROLL_TEST.load(Ordering::Relaxed) {
+            (synthetic_lines(), None)
+        } else {
+            match CONFIG_PATH.get().cloned().flatten() {
+                Some(path) => match load_config_lines(&path.to_string_lossy()) {
+                    Ok(lines) => (lines, Some(path)),
+                    Err(error) => (vec![format!("(cannot read {}: {error})", path.display())], None),
+                },
+                None => (Vec::new(), None),
+            }
+        };
         let mut app = Self {
             dpi: dpi.max(96),
             body: HFONT::default(),
@@ -1791,7 +1804,7 @@ impl App {
             selection_anchor: None,
             labels: Labels::new(),
             scroll_test_left: if SCROLL_TEST.load(Ordering::Relaxed) { 1500 } else { 0 },
-            doc_path: CONFIG_PATH.get().cloned().flatten(),
+            doc_path: startup_path,
             dirty: false,
             edit: None,
             value_edit: None,
@@ -1839,18 +1852,7 @@ impl App {
             live_warning_shown: false,
         };
         app.create_fonts();
-        let lines = if SCROLL_TEST.load(Ordering::Relaxed) {
-            synthetic_lines()
-        } else {
-            match CONFIG_PATH.get().cloned().flatten() {
-                Some(path) => match load_config_lines(&path.to_string_lossy()) {
-                    Ok(lines) => lines,
-                    Err(error) => vec![format!("(cannot read {}: {error})", path.display())],
-                },
-                None => Vec::new(),
-            }
-        };
-        app.set_lines(lines);
+        app.set_lines(startup_lines);
         let title = app.doc_title();
         app.tabs.push(TabInfo {
             title,
@@ -2195,22 +2197,38 @@ impl App {
         }
         self.commit_edit(hwnd, true);
         self.capture_active_tab();
-        let mut last = Some(self.active_tab);
+        let mut last = None;
         for path in paths {
-            let path_string = path.to_string_lossy().into_owned();
-            settings::push_recent(&mut self.recent_files, &path_string);
             if let Some(index) = self
                 .tabs
                 .iter()
                 .position(|tab| tab.path.as_ref().is_some_and(|open| same_file(open, &path)))
             {
+                settings::push_recent(
+                    &mut self.recent_files,
+                    &path.to_string_lossy(),
+                );
                 last = Some(index);
                 continue;
             }
+            let path_string = path.to_string_lossy().into_owned();
             let lines = match load_config_lines(&path_string) {
                 Ok(lines) => lines,
-                Err(error) => vec![format!("(cannot read {}: {error})", path.display())],
+                Err(error) => {
+                    let message = wide_z(&format!(
+                        "Could not read {}: {error}",
+                        path.display()
+                    ));
+                    let _ = MessageBoxW(
+                        Some(hwnd),
+                        PCWSTR(message.as_ptr()),
+                        w!("Equalizer APO"),
+                        MB_ICONWARNING,
+                    );
+                    continue;
+                }
             };
+            settings::push_recent(&mut self.recent_files, &path_string);
             let title = path
                 .file_name()
                 .map(|name| name.to_string_lossy().into_owned())
