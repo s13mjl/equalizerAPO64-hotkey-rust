@@ -1782,6 +1782,8 @@ struct App {
     channel_mask_from_device: bool,
     volume_controller: Option<VolumeController>,
     master_volume: Option<f64>,
+    /// Pending analysis restart after the system volume stopped moving.
+    volume_analysis_due: Option<std::time::Instant>,
     plot: PlotState,
     plot_fitted_for: (i32, i32),
     plot_rect: RECT,
@@ -1903,6 +1905,7 @@ impl App {
             channel_mask_from_device,
             volume_controller: None,
             master_volume: None,
+            volume_analysis_due: None,
             plot: PlotState::default(),
             plot_fitted_for: (0, 0),
             plot_rect: RECT::default(),
@@ -2506,6 +2509,15 @@ impl App {
     }
 
     fn poll_volume(&mut self, hwnd: HWND) {
+        // Recompute the loudness curve only after the volume stopped changing,
+        // otherwise dragging the system slider restarts the analysis on every
+        // poll.
+        if let Some(due) = self.volume_analysis_due {
+            if std::time::Instant::now() >= due {
+                self.volume_analysis_due = None;
+                self.start_analysis();
+            }
+        }
         if !self.rows.iter().any(|row| row.kind == FilterKind::Loudness) {
             return;
         }
@@ -2523,8 +2535,8 @@ impl App {
             return;
         }
         self.master_volume = Some(volume);
-        let mut repaint = false;
-        for row in &mut self.rows {
+        let mut changed_rows = Vec::new();
+        for (index, row) in self.rows.iter_mut().enumerate() {
             if row.kind != FilterKind::Loudness {
                 continue;
             }
@@ -2535,17 +2547,21 @@ impl App {
                 {
                     if *shown != volume {
                         *shown = volume;
-                        repaint = true;
+                        changed_rows.push(index);
                     }
                 }
             }
         }
-        if repaint {
+        if !changed_rows.is_empty() {
             unsafe {
-                let _ = InvalidateRect(Some(hwnd), None, false);
+                for index in changed_rows {
+                    self.invalidate_row(hwnd, index);
+                }
             }
         }
-        self.start_analysis();
+        self.volume_analysis_due = Some(
+            std::time::Instant::now() + std::time::Duration::from_millis(300),
+        );
     }
 
     unsafe fn create_fonts(&mut self) {
