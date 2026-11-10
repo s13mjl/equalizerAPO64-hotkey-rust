@@ -2462,10 +2462,28 @@ impl App {
         }
         if updated {
             unsafe {
-                let _ = InvalidateRect(Some(hwnd), None, false);
+                self.invalidate_analysis(hwnd);
             }
         }
         updated
+    }
+
+    /// Repaints only the analysis dock; a new result does not affect the table.
+    unsafe fn invalidate_analysis(&self, hwnd: HWND) {
+        let mut client = RECT::default();
+        let _ = GetClientRect(hwnd, &mut client);
+        let top = client.bottom - self.analysis_height();
+        if self.show_analysis && top >= 0 {
+            let rect = RECT {
+                left: 0,
+                top,
+                right: client.right,
+                bottom: client.bottom,
+            };
+            let _ = InvalidateRect(Some(hwnd), Some(&rect), false);
+        } else {
+            let _ = InvalidateRect(Some(hwnd), None, false);
+        }
     }
 
     fn poll_volume(&mut self, hwnd: HWND) {
