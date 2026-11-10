@@ -132,14 +132,18 @@ fn create_host_window(title: &str) -> Option<HWND> {
         if let Ok(menu) = CreateMenu() {
             let file = CreateMenu().ok();
             if let Some(file) = file {
-                let _ = AppendMenuW(menu, MF_STRING, ID_APPLY, w!("Apply"));
-                let _ = AppendMenuW(menu, MF_STRING, ID_OK, w!("OK"));
-                let _ = AppendMenuW(menu, MF_STRING, ID_CANCEL, w!("Cancel"));
+                let apply = HSTRING::from(crate::i18n::tr("Apply"));
+                let ok = HSTRING::from(crate::i18n::tr("OK"));
+                let cancel = HSTRING::from(crate::i18n::tr("Cancel"));
+                let file_label = HSTRING::from(crate::i18n::tr("File"));
+                let _ = AppendMenuW(menu, MF_STRING, ID_APPLY, PCWSTR(apply.as_ptr()));
+                let _ = AppendMenuW(menu, MF_STRING, ID_OK, PCWSTR(ok.as_ptr()));
+                let _ = AppendMenuW(menu, MF_STRING, ID_CANCEL, PCWSTR(cancel.as_ptr()));
                 let _ = windows::Win32::UI::WindowsAndMessaging::AppendMenuW(
                     menu,
                     windows::Win32::UI::WindowsAndMessaging::MF_POPUP,
                     file.0 as usize,
-                    w!("File"),
+                    PCWSTR(file_label.as_ptr()),
                 );
                 let _ = SetMenu(hwnd, Some(menu));
             }
