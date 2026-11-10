@@ -41,7 +41,7 @@ struct LogLine {
 
 pub struct DeviceTestDialog {
     entries: Vec<TestDeviceEntry>,
-    groups: Vec<&'static str>,
+    groups: Vec<String>,
     item_map: HashMap<String, usize>,
     log_lines: Vec<LogLine>,
     thread_finished: bool,
@@ -62,7 +62,7 @@ impl DeviceTestDialog {
         match filter_devices(false) {
             Ok(devices) if !devices.is_empty() => {
                 let group = groups.len();
-                groups.push("Playback devices");
+                groups.push(crate::i18n::tr("Playback devices"));
                 add_devices(&mut entries, &mut item_map, &devices, group);
             }
             Ok(_) => {}
@@ -72,7 +72,7 @@ impl DeviceTestDialog {
             match filter_devices(true) {
                 Ok(devices) if !devices.is_empty() => {
                     let group = groups.len();
-                    groups.push("Capture devices");
+                    groups.push(crate::i18n::tr("Capture devices"));
                     add_devices(&mut entries, &mut item_map, &devices, group);
                 }
                 Ok(_) => {}
@@ -139,14 +139,14 @@ impl DeviceTestDialog {
                         .num_columns(4)
                         .spacing([16.0, 4.0])
                         .show(ui, |ui| {
-                            ui.label(RichText::new("Connector").strong());
-                            ui.label(RichText::new("Device").strong());
-                            ui.label(RichText::new("Pre-mix").strong());
-                            ui.label(RichText::new("Post-mix").strong());
+                            ui.label(RichText::new(crate::i18n::tr("Connector")).strong());
+                            ui.label(RichText::new(crate::i18n::tr("Device")).strong());
+                            ui.label(RichText::new(crate::i18n::tr("Pre-mix")).strong());
+                            ui.label(RichText::new(crate::i18n::tr("Post-mix")).strong());
                             ui.end_row();
 
                             for (group_index, group_name) in self.groups.iter().enumerate() {
-                                ui.label(RichText::new(*group_name).strong());
+                                ui.label(RichText::new(group_name.as_str()).strong());
                                 ui.label("");
                                 ui.label("");
                                 ui.label("");
