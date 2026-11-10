@@ -133,7 +133,7 @@ fn main() {
         url.push_str("&manual=true");
     }
 
-    let tries = if mode == Mode::Auto { 10 } else { 1 };
+    let tries = if mode == Mode::Auto { 3 } else { 1 };
     let outcome = request_with_retries(&url, tries);
 
     match outcome {
@@ -232,7 +232,7 @@ fn request_with_retries(url: &str, mut tries: u32) -> HttpOutcome {
             HttpOutcome::TimedOut => {}
         }
         if tries > 0 {
-            std::thread::sleep(Duration::from_secs(5));
+            std::thread::sleep(Duration::from_secs(2));
         }
     }
     last
