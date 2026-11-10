@@ -2242,6 +2242,7 @@ impl App {
         } else {
             path
         };
+        let previous_path = self.doc_path.clone();
         self.doc_path = Some(path);
         let saved = self.save(hwnd);
         if saved {
@@ -2255,6 +2256,8 @@ impl App {
             self.save_hotkeys();
             self.update_title(hwnd);
             let _ = InvalidateRect(Some(hwnd), None, false);
+        } else {
+            self.doc_path = previous_path;
         }
         saved
     }
