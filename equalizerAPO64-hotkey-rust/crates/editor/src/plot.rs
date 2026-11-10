@@ -363,13 +363,12 @@ pub fn plot_frame(
     );
     ui.painter().rect_filled(full, 0.0, ui.visuals().extreme_bg_color);
 
-    let mut hover = response.hover_pos();
-    if !plot.contains(hover.unwrap_or(Pos2::ZERO)) {
-        hover = Some(Pos2::new(
-            hover.unwrap_or(plot.center()).x.clamp(plot.left(), plot.right()),
-            hover.unwrap_or(plot.center()).y.clamp(plot.top(), plot.bottom()),
-        ));
-    }
+    let hover = response.hover_pos().map(|h| {
+        Pos2::new(
+            h.x.clamp(plot.left(), plot.right()),
+            h.y.clamp(plot.top(), plot.bottom()),
+        )
+    });
 
     // Anchor-preserving wheel zoom.
     if response.hovered() {
@@ -468,7 +467,7 @@ pub fn show_graphic_eq(ui: &mut egui::Ui, ed: &mut GraphicEqEditor) -> GraphicEq
                 ed.selected = vec![i];
             }
             result.clicked_node = Some(i);
-        } else if let Some(h) = canvas.hover {
+        } else if let Some(h) = response.interact_pointer_pos().or_else(|| response.hover_pos()) {
             if plot.contains(h) {
                 ed.selected.clear();
                 result.clicked_node = None;
@@ -478,7 +477,7 @@ pub fn show_graphic_eq(ui: &mut egui::Ui, ed: &mut GraphicEqEditor) -> GraphicEq
     }
 
     if response.double_clicked() && ed.band_count == -1 {
-        if let Some(h) = canvas.hover {
+        if let Some(h) = response.hover_pos() {
             if plot.contains(h) {
                 let hz = state.freq_at(plot, h);
                 let db = state.db_at(plot, h).clamp(MIN_DB, MAX_DB);
