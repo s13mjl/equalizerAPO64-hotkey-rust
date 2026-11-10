@@ -2995,10 +2995,14 @@ impl App {
         prefs.recent_files = self.recent_files.clone();
         prefs.analysis_resolution = self.analysis_resolution;
         prefs.analysis_start_from = self.analysis_start_from;
-        prefs.analysis_zoom_x = self.plot.zoom_x;
-        prefs.analysis_zoom_y = self.plot.zoom_y;
-        prefs.analysis_scroll_x = self.plot.scroll_x.round() as i32;
-        prefs.analysis_scroll_y = self.plot.scroll_y.round() as i32;
+        // Keep the previous view when the analysis panel was never laid out in
+        // this session, otherwise closing the editor would reset it.
+        if self.plot_fitted_for != (0, 0) {
+            prefs.analysis_zoom_x = self.plot.zoom_x;
+            prefs.analysis_zoom_y = self.plot.zoom_y;
+            prefs.analysis_scroll_x = self.plot.scroll_x.round() as i32;
+            prefs.analysis_scroll_y = self.plot.scroll_y.round() as i32;
+        }
         prefs.analysis_channel = self
             .channel_names
             .get(self.analysis_channel_index)
