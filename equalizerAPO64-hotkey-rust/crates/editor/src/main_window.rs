@@ -1322,21 +1322,18 @@ impl EditorApp {
         // doChecks dialogs.
         if let Some(check) = self.check_queue.first() {
             let mut answer = None;
-            egui::Window::new(&check.title)
-                .collapsible(false)
-                .resizable(false)
-                .anchor(egui::Align2::CENTER_CENTER, Vec2::ZERO)
-                .show(ctx, |ui| {
-                    ui.label(&check.text);
-                    ui.horizontal(|ui| {
-                        if ui.button(crate::i18n::tr("Yes")).clicked() {
-                            answer = Some(true);
-                        }
-                        if ui.button(crate::i18n::tr("No")).clicked() {
-                            answer = Some(false);
-                        }
-                    });
+            egui::Modal::new(egui::Id::new("eapo_check_dialog")).show(ctx, |ui| {
+                ui.heading(&check.title);
+                ui.label(&check.text);
+                ui.horizontal(|ui| {
+                    if ui.button(crate::i18n::tr("Yes")).clicked() {
+                        answer = Some(true);
+                    }
+                    if ui.button(crate::i18n::tr("No")).clicked() {
+                        answer = Some(false);
+                    }
                 });
+            });
             if let Some(yes) = answer {
                 self.check_queue.remove(0);
                 if yes {
@@ -1348,16 +1345,13 @@ impl EditorApp {
 
         if let Some(info) = &self.info_dialog {
             let mut close = false;
-            egui::Window::new(&info.title)
-                .collapsible(false)
-                .resizable(false)
-                .anchor(egui::Align2::CENTER_CENTER, Vec2::ZERO)
-                .show(ctx, |ui| {
-                    ui.label(&info.text);
-                    if ui.button(crate::i18n::tr("OK")).clicked() {
-                        close = true;
-                    }
-                });
+            egui::Modal::new(egui::Id::new("eapo_info_dialog")).show(ctx, |ui| {
+                ui.heading(&info.title);
+                ui.label(&info.text);
+                if ui.button(crate::i18n::tr("OK")).clicked() {
+                    close = true;
+                }
+            });
             if close {
                 self.info_dialog = None;
             }
@@ -1386,25 +1380,22 @@ impl EditorApp {
                 .map(|t| if t.tooltip.is_empty() { t.config_path.clone() } else { t.tooltip.clone() })
                 .unwrap_or_default();
             let mut action = 0;
-            egui::Window::new(crate::i18n::tr("Unsaved changes"))
-                .collapsible(false)
-                .resizable(false)
-                .anchor(egui::Align2::CENTER_CENTER, Vec2::ZERO)
-                .show(ctx, |ui| {
-                    ui.label(crate::i18n::tr_arg("The configuration file %0 has unsaved changes.", &[&path]));
-                    ui.label(crate::i18n::tr("Do you want to save the changes before closing the file?"));
-                    ui.horizontal(|ui| {
-                        if ui.button(crate::i18n::tr("Save")).clicked() {
-                            action = 1;
-                        }
-                        if ui.button(crate::i18n::tr("Discard")).clicked() {
-                            action = 2;
-                        }
-                        if ui.button(crate::i18n::tr("Cancel")).clicked() {
-                            action = 3;
-                        }
-                    });
+            egui::Modal::new(egui::Id::new("eapo_close_prompt")).show(ctx, |ui| {
+                ui.heading(crate::i18n::tr("Unsaved changes"));
+                ui.label(crate::i18n::tr_arg("The configuration file %0 has unsaved changes.", &[&path]));
+                ui.label(crate::i18n::tr("Do you want to save the changes before closing the file?"));
+                ui.horizontal(|ui| {
+                    if ui.button(crate::i18n::tr("Save")).clicked() {
+                        action = 1;
+                    }
+                    if ui.button(crate::i18n::tr("Discard")).clicked() {
+                        action = 2;
+                    }
+                    if ui.button(crate::i18n::tr("Cancel")).clicked() {
+                        action = 3;
+                    }
                 });
+            });
             if action == 1 {
                 if self.save_tab(index) {
                     match target {
@@ -1442,21 +1433,18 @@ impl EditorApp {
         if let Some(prompt) = &self.restart_prompt {
             let action = prompt.action;
             let mut answer = None;
-            egui::Window::new(crate::i18n::tr("Restart required"))
-                .collapsible(false)
-                .resizable(false)
-                .anchor(egui::Align2::CENTER_CENTER, Vec2::ZERO)
-                .show(ctx, |ui| {
-                    ui.label(crate::i18n::tr("Configuration Editor will be restarted to apply the changed settings. Proceed?"));
-                    ui.horizontal(|ui| {
-                        if ui.button(crate::i18n::tr("Yes")).clicked() {
-                            answer = Some(true);
-                        }
-                        if ui.button(crate::i18n::tr("No")).clicked() {
-                            answer = Some(false);
-                        }
-                    });
+            egui::Modal::new(egui::Id::new("eapo_restart_prompt")).show(ctx, |ui| {
+                ui.heading(crate::i18n::tr("Restart required"));
+                ui.label(crate::i18n::tr("Configuration Editor will be restarted to apply the changed settings. Proceed?"));
+                ui.horizontal(|ui| {
+                    if ui.button(crate::i18n::tr("Yes")).clicked() {
+                        answer = Some(true);
+                    }
+                    if ui.button(crate::i18n::tr("No")).clicked() {
+                        answer = Some(false);
+                    }
                 });
+            });
             if let Some(true) = answer {
                 self.restart_prompt = None;
                 match action {
