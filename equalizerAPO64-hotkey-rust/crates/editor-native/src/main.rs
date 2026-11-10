@@ -733,6 +733,28 @@ fn geq_table_cell_at(
     Some((index, if x < split { 0 } else { 1 }))
 }
 
+/// Clickable strip for the GraphicEQ node table scrollbar.
+fn geq_table_scrollbar_rect(dpi: u32, table: &RECT) -> RECT {
+    let (first, _) = geq_table_metrics(dpi, table);
+    RECT {
+        left: table.right - scale(10, dpi),
+        top: first,
+        right: table.right,
+        bottom: table.bottom - 1,
+    }
+}
+
+/// Maps a y coordinate on the scrollbar track to the first visible node.
+fn geq_table_top_at_y(dpi: u32, table: &RECT, visible: usize, nodes: usize, y: i32) -> usize {
+    if visible == 0 || nodes <= visible {
+        return 0;
+    }
+    let (first, _) = geq_table_metrics(dpi, table);
+    let track_height = (table.bottom - 1 - first).max(1);
+    let relative = ((y - first).clamp(0, track_height) as f32) / track_height as f32;
+    (relative * (nodes - visible) as f32).round() as usize
+}
+
 fn format_geq_value(value: f64) -> String {
     let rounded = if value.abs() < 0.005 {
         0.0
@@ -1757,6 +1779,7 @@ struct App {
     plot_hover: Option<(i32, i32)>,
     plot_pan: Option<(i32, i32)>,
     geq_pan: Option<(usize, i32, i32)>,
+    geq_table_scroll_drag: Option<usize>,
     hover_pos: Option<(i32, i32)>,
     hot_rect: Option<RECT>,
     paint_offset: (i32, i32),
@@ -1873,6 +1896,7 @@ impl App {
             plot_hover: None,
             plot_pan: None,
             geq_pan: None,
+            geq_table_scroll_drag: None,
             hover_pos: None,
             hot_rect: None,
             paint_offset: (0, 0),
@@ -4472,6 +4496,7 @@ impl App {
         let mut vst_options = None;
         let mut edit_value: Option<ValueField> = None;
         let mut pan_geq = false;
+        let mut scroll_drag: Option<usize> = None;
         let mut biquad_menu: Option<(BiquadMenu, RECT)> = None;
         if let Some(item) = self.rows[row].item.as_mut() {
             match &mut item.editor {
@@ -4877,6 +4902,16 @@ impl App {
                         }
                         sync = true;
                         analyze = true;
+                    } else if graphic.nodes.len() > visible
+                        && point_in(&geq_table_scrollbar_rect(dpi, &table), x, mouse_y)
+                    {
+                        scroll_drag = Some(geq_table_top_at_y(
+                            dpi,
+                            &table,
+                            visible,
+                            graphic.nodes.len(),
+                            mouse_y,
+                        ));
                     } else if let Some((index, column)) = geq_table_cell_at(
                         dpi,
                         &table,
@@ -4933,6 +4968,13 @@ impl App {
                 }
                 _ => {}
             }
+        }
+        if let Some(top) = scroll_drag {
+            self.rows[row].geq_table_top = top;
+            self.geq_table_scroll_drag = Some(row);
+            let _ = SetCapture(hwnd);
+            self.invalidate_row(hwnd, row);
+            return;
         }
         if pan_geq {
             self.geq_pan = Some((row, x, mouse_y));
@@ -5270,6 +5312,32 @@ impl App {
             }
             return;
         }
+        if let Some(row) = self.geq_table_scroll_drag {
+            if row >= self.rows.len() {
+                self.geq_table_scroll_drag = None;
+                let _ = ReleaseCapture();
+                return;
+            }
+            let mut client = RECT::default();
+            let _ = GetClientRect(hwnd, &mut client);
+            let row_y = self.chrome_height() + self.prefix[row] as i32 - self.offset;
+            let table = geq_table_rect(self.dpi, row_y, self.rows[row].height as i32, client.right);
+            let visible = geq_table_visible_rows(self.dpi, &table);
+            let nodes = match self.rows[row]
+                .item
+                .as_ref()
+                .and_then(|item| item.editor.as_ref())
+            {
+                Some(FilterEditor::GraphicEq(graphic)) => graphic.nodes.len(),
+                _ => 0,
+            };
+            let top = geq_table_top_at_y(self.dpi, &table, visible, nodes, move_y);
+            if top != self.rows[row].geq_table_top {
+                self.rows[row].geq_table_top = top;
+                self.invalidate_row(hwnd, row);
+            }
+            return;
+        }
         if let Some((row, last_x, last_y)) = self.geq_pan {
             if row >= self.rows.len() {
                 self.geq_pan = None;
@@ -5440,6 +5508,10 @@ impl App {
     }
 
     unsafe fn on_mouse_up(&mut self, hwnd: HWND) {
+        if self.geq_table_scroll_drag.take().is_some() {
+            let _ = ReleaseCapture();
+            return;
+        }
         if self.plot_pan.take().is_some() {
             let _ = ReleaseCapture();
             self.invalidate_plot(hwnd);
