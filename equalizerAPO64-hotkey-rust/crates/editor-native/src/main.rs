@@ -7576,6 +7576,11 @@ unsafe extern "system" fn main_window_proc(
             let mut allow = true;
             if let Some(state) = app(hwnd) {
                 allow = state.confirm_close(hwnd);
+                if !allow {
+                    // A pending reset/restart must not fire after the user
+                    // cancelled the save prompt.
+                    state.restart_after_close = false;
+                }
             }
             if allow {
                 if let Some(state) = app(hwnd) {
