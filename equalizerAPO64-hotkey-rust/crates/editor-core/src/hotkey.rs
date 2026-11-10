@@ -273,11 +273,11 @@ impl HotkeyManager {
             return false;
         }
 
-        let id = self.next_hotkey_id;
-        self.next_hotkey_id += 1;
-        if self.next_hotkey_id > HOTKEY_MAX_ID {
-            self.next_hotkey_id = HOTKEY_BASE_ID;
-        }
+        let id = self.next_free_hotkey_id();
+        let Some(id) = id else {
+            log_hotkey("RegisterHotKey FAILED: no free hotkey id");
+            return false;
+        };
 
         if !self.worker.register_hotkey(id, modifiers, vk) {
             log_hotkey(&format!(
@@ -308,6 +308,25 @@ impl HotkeyManager {
     pub fn unregister_hotkey(&mut self, filter_id: &str) {
         let Some(info) = self.hotkeys.remove(filter_id) else { return };
         self.worker.unregister_hotkey(info.id);
+    }
+
+    /// Returns an ID that is not currently registered, wrapping once.
+    fn next_free_hotkey_id(&mut self) -> Option<i32> {
+        let start = self.next_hotkey_id;
+        loop {
+            let id = self.next_hotkey_id;
+            self.next_hotkey_id = if id >= HOTKEY_MAX_ID {
+                HOTKEY_BASE_ID
+            } else {
+                id + 1
+            };
+            if !self.hotkeys.values().any(|hotkey| hotkey.id == id) {
+                return Some(id);
+            }
+            if self.next_hotkey_id == start {
+                return None;
+            }
+        }
     }
 
     pub fn clear_all(&mut self) {
