@@ -5077,7 +5077,15 @@ impl App {
                         db_gain,
                     });
                     graphic.sort_nodes();
-                    graphic.selected = vec![graphic.nodes.len().saturating_sub(1)];
+                    graphic.selected = graphic
+                        .nodes
+                        .iter()
+                        .position(|node| {
+                            (node.freq - frequency).abs() < 1e-9
+                                && (node.db_gain - db_gain).abs() < 1e-9
+                        })
+                        .map(|index| vec![index])
+                        .unwrap_or_default();
                     added = true;
                 }
             }
