@@ -155,6 +155,9 @@ pub struct EditorApp {
     restart_flag: Arc<AtomicBool>,
     ui_ctx: egui::Context,
     window_size: (f32, f32),
+    /// Debounced write-back for instant mode; dragging a value must not write
+    /// the configuration file on every frame.
+    instant_save_due: Option<Instant>,
 }
 
 impl EditorApp {
@@ -222,6 +225,7 @@ impl EditorApp {
             restart_flag,
             ui_ctx,
             window_size,
+            instant_save_due: None,
         };
         app.analysis_state.zoom_x = prefs.analysis_zoom_x;
         app.analysis_state.zoom_y = prefs.analysis_zoom_y;
@@ -567,6 +571,7 @@ impl EditorApp {
     }
 
     fn finalize_close(&mut self, ctx: &egui::Context) {
+        self.flush_instant_save();
         self.save_preferences();
         self.closing = true;
         ctx.send_viewport_cmd(egui::ViewportCommand::Close);
@@ -833,10 +838,12 @@ impl EditorApp {
                 ui.add_space(10.0);
                 let was = self.instant_mode;
                 if ui.checkbox(&mut self.instant_mode, crate::i18n::tr("Instant mode")).on_hover_text(crate::i18n::tr("Changes are saved immediately")).changed()
-                    && !was
-                    && self.instant_mode
                 {
-                    self.instant_mode_enabled();
+                    if self.instant_mode && !was {
+                        self.instant_mode_enabled();
+                    } else if !self.instant_mode {
+                        self.instant_save_due = None;
+                    }
                 }
                 ui.separator();
                 ui.label(crate::i18n::tr("Device: "));
@@ -1138,7 +1145,25 @@ impl EditorApp {
         }
         self.tabs[self.active_tab].mark_changed();
         if self.instant_mode && !self.tabs[self.active_tab].config_path.is_empty() {
-            self.save_tab(self.active_tab);
+            // Debounce so dragging a slider does not rewrite the file on every
+            // frame (which also makes the audio engine reload constantly).
+            self.instant_save_due = Some(Instant::now() + Duration::from_millis(300));
+            self.ui_ctx.request_repaint_after(Duration::from_millis(300));
+        }
+    }
+
+    fn flush_instant_save(&mut self) {
+        self.instant_save_due = None;
+        if !self.instant_mode {
+            return;
+        }
+        for index in 0..self.tabs.len() {
+            if self.close_discarded.contains(&index) {
+                continue;
+            }
+            if self.tabs[index].dirty && !self.tabs[index].config_path.is_empty() {
+                self.save_tab(index);
+            }
         }
     }
 
@@ -1487,6 +1512,14 @@ fn round_resolution(value: i32) -> i32 {
 
 impl eframe::App for EditorApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        if let Some(due) = self.instant_save_due {
+            let now = Instant::now();
+            if now >= due {
+                self.flush_instant_save();
+            } else {
+                ctx.request_repaint_after(due - now);
+            }
+        }
         let size = ctx.screen_rect().size();
         if size.x > 0.0 && size.y > 0.0 {
             self.window_size = (size.x, size.y);
