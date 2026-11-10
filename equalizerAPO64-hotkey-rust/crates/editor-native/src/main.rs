@@ -1747,6 +1747,8 @@ struct App {
     devices: Vec<Arc<dyn AbstractAPOInfo>>,
     selected_device: Option<Arc<dyn AbstractAPOInfo>>,
     channel_mask: u32,
+    /// True while the channel selection follows the selected device.
+    channel_mask_from_device: bool,
     volume_controller: Option<VolumeController>,
     master_volume: Option<f64>,
     plot: PlotState,
@@ -1801,6 +1803,7 @@ impl App {
             .iter()
             .position(|name| name.eq_ignore_ascii_case(prefs.analysis_channel.trim()))
             .unwrap_or(0);
+        let channel_mask_from_device = prefs.selected_channel_mask == 0;
         // A file that cannot be read must not keep its path in the tab: saving
         // would otherwise overwrite the real configuration with the error row.
         let (startup_lines, startup_path) = if SCROLL_TEST.load(Ordering::Relaxed) {
@@ -1861,6 +1864,7 @@ impl App {
             devices,
             selected_device,
             channel_mask,
+            channel_mask_from_device,
             volume_controller: None,
             master_volume: None,
             plot: PlotState::default(),
@@ -2842,7 +2846,11 @@ impl App {
             .as_ref()
             .map(|device| device.get_device_string())
             .unwrap_or_default();
-        prefs.selected_channel_mask = self.channel_mask as i32;
+        prefs.selected_channel_mask = if self.channel_mask_from_device {
+            0
+        } else {
+            self.channel_mask as i32
+        };
         // Use the restored geometry: when the window is minimized,
         // GetWindowRect reports the off-screen icon position (-32000) and a
         // tiny size, which must never be persisted.
@@ -3619,7 +3627,9 @@ impl App {
             return;
         };
         self.selected_device = Some(device.clone());
-        self.channel_mask = device.get_channel_mask().max(1);
+        if self.channel_mask_from_device {
+            self.channel_mask = device.get_channel_mask().max(1);
+        }
         self.channel_names = channel_helper::get_channel_names(
             device.get_channel_count() as i32,
             self.channel_mask,
@@ -3668,14 +3678,17 @@ impl App {
             return;
         }
         let mask = options[command - 830].1;
-        self.channel_mask = if mask == 0 {
-            self.selected_device
+        if mask == 0 {
+            self.channel_mask_from_device = true;
+            self.channel_mask = self
+                .selected_device
                 .as_ref()
                 .map(|device| device.get_channel_mask())
-                .unwrap_or(3)
+                .unwrap_or(3);
         } else {
-            mask
-        };
+            self.channel_mask_from_device = false;
+            self.channel_mask = mask;
+        }
         let channel_count = self
             .selected_device
             .as_ref()
