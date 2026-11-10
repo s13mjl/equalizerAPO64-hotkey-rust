@@ -938,6 +938,7 @@ pub fn load_config_lines(path: &str) -> std::io::Result<Vec<String>> {
         Ok(t) => t,
         Err(e) => String::from_utf8_lossy(e.as_bytes()).into_owned(),
     };
+    let text = text.strip_prefix('\u{feff}').unwrap_or(&text);
     let mut lines = Vec::new();
     for line in text.split('\n') {
         lines.push(line.strip_suffix('\r').unwrap_or(line).to_string());

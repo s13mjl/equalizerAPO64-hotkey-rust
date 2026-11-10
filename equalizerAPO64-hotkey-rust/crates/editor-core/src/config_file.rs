@@ -46,6 +46,7 @@ pub fn load_config_lines(path: &str) -> std::io::Result<Vec<String>> {
         Ok(text) => text,
         Err(error) => String::from_utf8_lossy(error.as_bytes()).into_owned(),
     };
+    let text = text.strip_prefix('\u{feff}').unwrap_or(&text);
     let mut lines: Vec<String> = text
         .split('\n')
         .map(|line| line.strip_suffix('\r').unwrap_or(line).to_string())
