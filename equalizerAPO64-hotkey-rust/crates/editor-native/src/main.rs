@@ -2652,6 +2652,43 @@ impl App {
         let _ = CheckMenuItem(settings, 132, MF_BYCOMMAND.0 | checked(LiveMode::AllTabs));
     }
 
+    /// Asks for every dirty tab before the window closes.  Saving a tab that is
+    /// not in front requires loading it, so the original tab is restored when
+    /// the user cancels.
+    unsafe fn confirm_close(&mut self, hwnd: HWND) -> bool {
+        self.commit_value_edit(hwnd, true);
+        self.commit_edit(hwnd, true);
+        self.capture_active_tab();
+        let original = self.active_tab;
+        for index in 0..self.tabs.len() {
+            if !self.tabs[index].dirty {
+                continue;
+            }
+            let title = wide_z(&format!(
+                "Save changes to {} before closing?",
+                self.tabs[index].title
+            ));
+            let answer = MessageBoxW(
+                Some(hwnd),
+                PCWSTR(title.as_ptr()),
+                w!("Equalizer APO"),
+                MB_YESNOCANCEL | MB_ICONWARNING,
+            );
+            if answer.0 == IDCANCEL.0 {
+                self.load_tab(hwnd, original);
+                return false;
+            }
+            if answer.0 == IDYES.0 {
+                self.load_tab(hwnd, index);
+                if !self.save(hwnd) {
+                    self.load_tab(hwnd, original);
+                    return false;
+                }
+            }
+        }
+        true
+    }
+
     unsafe fn save_preferences(&mut self, hwnd: HWND) {
         let mut prefs = self.prefs.clone();
         prefs.instant_mode = self.instant_mode;
@@ -7129,20 +7166,7 @@ unsafe extern "system" fn main_window_proc(
         WM_CLOSE => {
             let mut allow = true;
             if let Some(state) = app(hwnd) {
-                state.commit_edit(hwnd, true);
-                if state.dirty {
-                    let answer = MessageBoxW(
-                        Some(hwnd),
-                        w!("Save changes before closing?"),
-                        w!("Equalizer APO"),
-                        MB_YESNOCANCEL | MB_ICONWARNING,
-                    );
-                    if answer.0 == IDCANCEL.0 {
-                        allow = false;
-                    } else if answer.0 == IDYES.0 {
-                        allow = state.save(hwnd);
-                    }
-                }
+                allow = state.confirm_close(hwnd);
             }
             if allow {
                 if let Some(state) = app(hwnd) {
