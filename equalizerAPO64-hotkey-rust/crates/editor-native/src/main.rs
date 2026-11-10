@@ -1721,6 +1721,14 @@ enum AnalysisSetting {
     Resolution,
 }
 
+/// Screen-space analysis curve, rebuilt only when the data or the view
+/// transform changes so hovering stays cheap.
+struct AnalysisCurve {
+    key: (u64, i32, i32, i32, i32, u32, u32, u64, u64),
+    runs: Vec<(COLORREF, Vec<PointF>)>,
+    fills: Vec<(i32, i32, i32, i32)>,
+}
+
 struct App {
     dpi: u32,
     body: HFONT,
@@ -1743,6 +1751,7 @@ struct App {
     value_edit: Option<ValueEdit>,
     analysis: AnalysisThread,
     analysis_result: Option<AnalysisResult>,
+    analysis_curve: Option<AnalysisCurve>,
     analysis_generation: u64,
     show_toolbar: bool,
     show_analysis: bool,
@@ -1864,6 +1873,7 @@ impl App {
             value_edit: None,
             analysis: AnalysisThread::new(),
             analysis_result: None,
+            analysis_curve: None,
             analysis_generation: 0,
             show_toolbar,
             show_analysis: !SCROLL_TEST.load(Ordering::Relaxed) && prefs.show_analysis,
@@ -6217,80 +6227,113 @@ impl App {
         let Some(result) = &self.analysis_result else {
             return;
         };
-        let sample_rate = result.freq_data_sample_rate.max(1) as f64;
-        let bins = result.freq_data.len().max(1);
+        // The curve only depends on the FFT data, the plot geometry and the
+        // view transform.  Hovering only moves the crosshair, so rebuilding
+        // every run on each mouse move was wasted work.
+        let curve_key = (
+            self.analysis_generation,
+            plot_left,
+            plot_top,
+            plot_right,
+            plot_bottom,
+            plot.scroll_x.to_bits(),
+            plot.scroll_y.to_bits(),
+            plot.zoom_x.to_bits(),
+            plot.zoom_y.to_bits(),
+        );
+        let rebuild = self
+            .analysis_curve
+            .as_ref()
+            .map_or(true, |curve| curve.key != curve_key);
+        if rebuild {
+            let sample_rate = result.freq_data_sample_rate.max(1) as f64;
+            let bins = result.freq_data.len().max(1);
+            // 0 dB reference in view coordinates (pos_for already subtracts
+            // the scroll offset, unlike the raw scene-space db_to_y).
+            let zero_y = plot
+                .pos_for(1000.0, 0.0)
+                .map(|(_, view_y)| plot_top + view_y as i32)
+                .unwrap_or(plot_bottom);
+            let mut runs: Vec<(COLORREF, Vec<PointF>)> = Vec::new();
+            let mut fills: Vec<(i32, i32, i32, i32)> = Vec::new();
+            let mut run_points: Vec<PointF> = Vec::new();
+            let mut run_positive = false;
+            let mut path_open = false;
+            for px in plot_left..plot_right {
+                let hz = plot.freq_at((px - plot_left) as f32);
+                if hz <= 0.0 {
+                    continue;
+                }
+                // Linear interpolation between FFT bins: nearest-bin lookup
+                // made the curve piecewise constant ("staircase") at lower
+                // resolutions.
+                let position = (hz / sample_rate) * result.freq_data_length as f64;
+                let lower = position.floor().max(0.0) as usize;
+                let upper = (lower + 1).min(bins - 1);
+                let fraction = (position - lower as f64).clamp(0.0, 1.0);
+                let magnitude_at = |index: usize| {
+                    let value = result.freq_data[index.min(bins - 1)];
+                    (value.re * value.re + value.im * value.im).sqrt()
+                };
+                let magnitude =
+                    magnitude_at(lower) * (1.0 - fraction) + magnitude_at(upper) * fraction;
+                let db = (20.0 * magnitude.log10()).clamp(-100.0, 100.0);
+                let Some((_, scene_y)) = plot.pos_for(hz, db) else {
+                    if path_open && run_points.len() >= 2 {
+                        runs.push((
+                            if run_positive { CURVE_POS } else { CURVE },
+                            std::mem::take(&mut run_points),
+                        ));
+                    }
+                    run_points.clear();
+                    path_open = false;
+                    continue;
+                };
+                // Keep the sub-pixel Y for the curve; rounding to integer
+                // pixels here produced the visible staircase even with
+                // anti-aliasing.
+                let y_subpixel = plot_top as f32 + scene_y;
+                let y = y_subpixel as i32;
+                let positive = db > 0.0;
+                if positive && y < zero_y {
+                    fills.push((px, y, px + 1, zero_y));
+                }
+                if path_open && positive != run_positive {
+                    if run_points.len() >= 2 {
+                        runs.push((
+                            if run_positive { CURVE_POS } else { CURVE },
+                            std::mem::take(&mut run_points),
+                        ));
+                    }
+                    run_points.clear();
+                }
+                run_positive = positive;
+                run_points.push(PointF {
+                    X: px as f32 + 0.5,
+                    Y: y_subpixel.clamp(
+                        plot_top as f32,
+                        plot_bottom.saturating_sub(1).max(plot_top) as f32,
+                    ),
+                });
+                path_open = true;
+            }
+            if path_open && run_points.len() >= 2 {
+                runs.push((if run_positive { CURVE_POS } else { CURVE }, run_points));
+            }
+            self.analysis_curve = Some(AnalysisCurve {
+                key: curve_key,
+                runs,
+                fills,
+            });
+        }
         let saved_dc = SaveDC(hdc);
         let _ = IntersectClipRect(hdc, plot_left, plot_top, plot_right, plot_bottom);
-        // 0 dB reference in view coordinates (pos_for already subtracts the
-        // scroll offset, unlike the raw scene-space db_to_y).
-        let zero_y = plot
-            .pos_for(1000.0, 0.0)
-            .map(|(_, view_y)| plot_top + view_y as i32)
-            .unwrap_or(plot_bottom);
-        let mut runs: Vec<(COLORREF, Vec<PointF>)> = Vec::new();
-        let mut run_points: Vec<PointF> = Vec::new();
-        let mut run_positive = false;
-        let mut path_open = false;
-        for px in plot_left..plot_right {
-            let hz = plot.freq_at((px - plot_left) as f32);
-            if hz <= 0.0 {
-                continue;
+        if let Some(curve) = &self.analysis_curve {
+            for &(left, top, right, bottom) in &curve.fills {
+                fill(hdc, left, top, right, bottom, FILL_POS);
             }
-            // Linear interpolation between FFT bins: nearest-bin lookup made
-            // the curve piecewise constant ("staircase") at lower resolutions.
-            let position = (hz / sample_rate) * result.freq_data_length as f64;
-            let lower = position.floor().max(0.0) as usize;
-            let upper = (lower + 1).min(bins - 1);
-            let fraction = (position - lower as f64).clamp(0.0, 1.0);
-            let magnitude_at = |index: usize| {
-                let value = result.freq_data[index.min(bins - 1)];
-                (value.re * value.re + value.im * value.im).sqrt()
-            };
-            let magnitude =
-                magnitude_at(lower) * (1.0 - fraction) + magnitude_at(upper) * fraction;
-            let db = (20.0 * magnitude.log10()).clamp(-100.0, 100.0);
-            let Some((_, scene_y)) = plot.pos_for(hz, db) else {
-                if path_open && run_points.len() >= 2 {
-                    runs.push((
-                        if run_positive { CURVE_POS } else { CURVE },
-                        std::mem::take(&mut run_points),
-                    ));
-                }
-                run_points.clear();
-                path_open = false;
-                continue;
-            };
-            // Keep the sub-pixel Y for the curve; rounding to integer pixels
-            // here produced the visible staircase even with anti-aliasing.
-            let y_subpixel = plot_top as f32 + scene_y;
-            let y = y_subpixel as i32;
-            let positive = db > 0.0;
-            if positive && y < zero_y {
-                fill(hdc, px, y, px + 1, zero_y, FILL_POS);
-            }
-            if path_open && positive != run_positive {
-                if run_points.len() >= 2 {
-                    runs.push((
-                        if run_positive { CURVE_POS } else { CURVE },
-                        std::mem::take(&mut run_points),
-                    ));
-                }
-                run_points.clear();
-            }
-            run_positive = positive;
-            run_points.push(PointF {
-                X: px as f32 + 0.5,
-                Y: y_subpixel.clamp(
-                    plot_top as f32,
-                    plot_bottom.saturating_sub(1).max(plot_top) as f32,
-                ),
-            });
-            path_open = true;
+            draw_aa_runs(hdc, self.paint_offset, &curve.runs, self.plot_rect);
         }
-        if path_open && run_points.len() >= 2 {
-            runs.push((if run_positive { CURVE_POS } else { CURVE }, run_points));
-        }
-        draw_aa_runs(hdc, self.paint_offset, &runs, self.plot_rect);
         let _ = RestoreDC(hdc, saved_dc);
     }
 
