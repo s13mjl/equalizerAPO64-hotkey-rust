@@ -302,14 +302,12 @@ impl HotkeyManager {
                 enabled: true,
             },
         );
-        self.save_settings();
         true
     }
 
     pub fn unregister_hotkey(&mut self, filter_id: &str) {
         let Some(info) = self.hotkeys.remove(filter_id) else { return };
         self.worker.unregister_hotkey(info.id);
-        self.save_settings();
     }
 
     pub fn clear_all(&mut self) {

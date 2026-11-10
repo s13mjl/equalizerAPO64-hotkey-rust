@@ -2047,6 +2047,7 @@ impl App {
                 let filter_id = format!("{:x}", row.uid);
                 let _ = self.hotkeys.register_hotkey(&filter_id, Some(sequence));
             }
+            self.hotkeys.save_settings();
             return;
         }
         // Files written before `hotkeyBindings` existed only have the row
@@ -2066,6 +2067,7 @@ impl App {
             let filter_id = format!("{:x}", row.uid);
             let _ = self.hotkeys.register_hotkey(&filter_id, Some(sequence));
         }
+        self.hotkeys.save_settings();
     }
 
     fn save_hotkeys(&self) {
@@ -2145,6 +2147,7 @@ impl App {
         }
         self.rows[row].hotkey = sequence;
         self.save_hotkeys();
+        self.hotkeys.save_settings();
         self.invalidate_row(hwnd, row);
     }
 
@@ -2156,6 +2159,7 @@ impl App {
         self.hotkeys.unregister_hotkey(&filter_id);
         self.rows[row].hotkey = None;
         self.save_hotkeys();
+        self.hotkeys.save_settings();
         self.invalidate_row(hwnd, row);
     }
 
