@@ -16,9 +16,9 @@ use windows::Win32::UI::HiDpi::GetDpiForWindow;
 use windows::Win32::UI::Input::KeyboardAndMouse::EnableWindow;
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetClientRect, GetMessageW,
-    GetParent, GetWindowLongPtrW, GetWindowRect, IsDialogMessageW, IsWindow, LoadCursorW, RegisterClassW,
+    GetParent, GetSystemMetrics, GetWindowLongPtrW, GetWindowRect, IsDialogMessageW, IsWindow, LoadCursorW, RegisterClassW,
     SendMessageW, SetForegroundWindow, SetWindowLongPtrW, ShowWindow, TranslateMessage,
-    CREATESTRUCTW, CS_HREDRAW, CS_VREDRAW, GWLP_USERDATA, HMENU, IDC_ARROW, MSG, SW_SHOW,
+    CREATESTRUCTW, CS_HREDRAW, CS_VREDRAW, GWLP_USERDATA, HMENU, IDC_ARROW, MSG, SM_CXSCREEN, SM_CYSCREEN, SW_SHOW,
     WM_CLOSE, WM_COMMAND, WM_CREATE, WM_NCDESTROY, WM_SETFONT, WNDCLASSW, WINDOW_EX_STYLE,
     WINDOW_STYLE, WS_CAPTION, WS_CHILD, WS_POPUP, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
@@ -54,6 +54,8 @@ struct ChooserState {
     items: Vec<String>,
     checked: Vec<bool>,
     keep: Vec<bool>,
+    columns: i32,
+    rows: i32,
     all_label: Option<String>,
     all_checked: bool,
     filter_label: Option<String>,
@@ -78,6 +80,18 @@ fn column_count(items: usize) -> i32 {
 fn row_count(items: usize, columns: i32) -> i32 {
     let columns = columns.max(1) as usize;
     ((items + columns - 1) / columns) as i32
+}
+
+/// Chooses columns/rows so the dialog fits the screen height where possible.
+fn layout_counts(items: usize, dpi: u32) -> (i32, i32) {
+    let line = scale(24, dpi).max(1);
+    let screen_height = unsafe { GetSystemMetrics(SM_CYSCREEN) }.max(240) as i32;
+    let screen_width = unsafe { GetSystemMetrics(SM_CXSCREEN) }.max(320) as i32;
+    let max_rows = ((screen_height - scale(160, dpi)) / line).max(1);
+    let needed = ((items as i32 + max_rows - 1) / max_rows).max(1);
+    let max_columns = ((screen_width - scale(24, dpi)) / scale(460, dpi)).max(1);
+    let columns = column_count(items).max(needed).min(max_columns).max(1);
+    (columns, row_count(items, columns))
 }
 
 unsafe fn is_checked(hwnd: HWND) -> bool {
@@ -235,8 +249,8 @@ unsafe fn build_controls(hwnd: HWND, state: &mut ChooserState) {
     let _ = GetClientRect(hwnd, &mut client);
     let margin = scale(12, dpi);
     let line = scale(24, dpi);
-    let columns = column_count(state.items.len());
-    let rows = row_count(state.items.len(), columns);
+    let columns = state.columns.max(1);
+    let rows = state.rows.max(1);
     let column_width = (client.right - margin * 2) / columns.max(1);
     let mut y = margin;
     if let Some(label) = state.all_label.clone() {
@@ -362,8 +376,7 @@ pub unsafe fn check_list(
     let dpi = GetDpiForWindow(parent).max(96);
     let margin = scale(12, dpi);
     let line = scale(24, dpi);
-    let columns = column_count(items.len());
-    let rows = row_count(items.len(), columns);
+    let (columns, rows) = layout_counts(items.len(), dpi);
     let width = margin * 2 + columns * scale(460, dpi);
     let height = (margin
         + if options.all_label.is_some() { line } else { 0 }
@@ -407,6 +420,8 @@ pub unsafe fn check_list(
         items: items.to_vec(),
         checked: (0..items.len()).map(|index| checked.contains(&index)).collect(),
         keep,
+        columns,
+        rows,
         all_label: options.all_label.clone(),
         all_checked: options.all_checked,
         filter_label: filter.as_ref().map(|(label, _, _)| label.clone()),
