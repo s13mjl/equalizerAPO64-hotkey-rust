@@ -59,6 +59,7 @@ static GERMAN: &[(&str, &str)] = &[
     ("The update check failed.", "Die Updateprüfung ist fehlgeschlagen."),
     ("The update server returned HTTP %0.", "Der Update-Server hat HTTP %0 zurückgegeben."),
     ("The response is not a JSON object", "Die Antwort ist kein JSON-Objekt"),
+    ("The update response could not be parsed.", "Die Update-Antwort konnte nicht analysiert werden."),
 ];
 
 static FRENCH: &[(&str, &str)] = &[
@@ -87,6 +88,7 @@ static FRENCH: &[(&str, &str)] = &[
     ("The update check failed.", "La vérification de mise à jour a échoué."),
     ("The update server returned HTTP %0.", "Le serveur de mise à jour a renvoyé HTTP %0."),
     ("The response is not a JSON object", "La réponse n'est pas un objet JSON"),
+    ("The update response could not be parsed.", "La réponse de mise à jour n'a pas pu être analysée."),
 ];
 
 static CHINESE: &[(&str, &str)] = &[
@@ -116,5 +118,6 @@ static CHINESE: &[(&str, &str)] = &[
     ("The update check failed.", "更新检查失败。"),
     ("The update server returned HTTP %0.", "更新服务器返回 HTTP %0。"),
     ("The response is not a JSON object", "响应不是 JSON 对象"),
+    ("The update response could not be parsed.", "无法解析更新响应。"),
 ];
 

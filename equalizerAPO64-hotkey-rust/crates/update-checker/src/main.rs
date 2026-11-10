@@ -397,7 +397,8 @@ fn split_url(url: &str) -> Option<(&str, &str)> {
 /// Parses the JSON document returned by the update service. The error string
 /// mirrors `QJsonParseError::errorString()` closely enough for the dialog.
 fn parse_update_document(text: &str) -> Result<UpdateData, String> {
-    let value: Value = serde_json::from_str(text).map_err(|e| e.to_string())?;
+    let value: Value = serde_json::from_str(text)
+        .map_err(|_| "The update response could not be parsed.".to_string())?;
     let object = value
         .as_object()
         .ok_or_else(|| "The response is not a JSON object".to_string())?;
