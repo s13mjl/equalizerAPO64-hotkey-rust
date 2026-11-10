@@ -96,10 +96,12 @@ use windows::Win32::UI::WindowsAndMessaging::{
     SB_ENDSCROLL,
 };
 
+#[cfg(debug_assertions)]
 const ROWS: usize = 10_000;
 const ID_EXIT: usize = 199;
 const ID_SAVE: usize = 103;
 const ID_DELETE: usize = 114;
+#[cfg(debug_assertions)]
 const TIMER_SCROLL_TEST: usize = 1;
 const TIMER_ANALYSIS: usize = 2;
 const WM_APP_COMMIT_EDIT: u32 = WM_APP + 1;
@@ -184,10 +186,23 @@ const ADD_GROUPS: &[(&str, &[(&str, &str)])] = &[    (
     ("Other", &[("Comment", "# ")]),
 ];
 
+#[cfg(debug_assertions)]
 static SCROLL_TEST: AtomicBool = AtomicBool::new(false);
 static SUPPRESS_KEYMENU: AtomicBool = AtomicBool::new(false);
 static SKIP_CHECKS: AtomicBool = AtomicBool::new(false);
 static CONFIG_PATH: OnceLock<Option<PathBuf>> = OnceLock::new();
+
+/// The synthetic scroll benchmark is a development aid; release builds never
+/// contain it.
+#[cfg(debug_assertions)]
+fn scroll_test_enabled() -> bool {
+    SCROLL_TEST.load(Ordering::Relaxed)
+}
+
+#[cfg(not(debug_assertions))]
+fn scroll_test_enabled() -> bool {
+    false
+}
 
 const WHITE: COLORREF = COLORREF(0x00FF_FFFF);
 const TABLE_BG: COLORREF = COLORREF(0x00FA_FAFA);
@@ -521,6 +536,7 @@ fn push_u32(buffer: &mut [u16], len: &mut usize, mut value: u32) {
     }
 }
 
+#[cfg(debug_assertions)]
 fn row_is_expanded(index: usize) -> bool {
     index % 20 == 7
 }
@@ -1659,6 +1675,7 @@ unsafe fn paint_copy_row(hdc: HDC, dpi: u32, y: i32, parameters: &str, enabled: 
     draw_control(hdc, dpi, &button, &format!("{}...", i18n::tr("Edit")), enabled, None);
 }
 
+#[cfg(debug_assertions)]
 fn synthetic_lines() -> Vec<String> {
     (0..ROWS)
         .map(|index| {
@@ -1672,6 +1689,16 @@ fn synthetic_lines() -> Vec<String> {
             }
         })
         .collect()
+}
+
+#[cfg(debug_assertions)]
+fn scroll_test_startup() -> (Vec<String>, Option<PathBuf>) {
+    (synthetic_lines(), None)
+}
+
+#[cfg(not(debug_assertions))]
+fn scroll_test_startup() -> (Vec<String>, Option<PathBuf>) {
+    (Vec::new(), None)
 }
 
 fn push_utf16(buffer: &mut [u16], len: &mut usize, text: &str) {
@@ -1743,6 +1770,7 @@ struct App {
     labels: Labels,
     /// Label buffers of the rebuildable File menu; `AppendMenuW` keeps pointers.
     menu_labels: Vec<Vec<u16>>,
+    #[cfg(debug_assertions)]
     scroll_test_left: usize,
     doc_path: Option<PathBuf>,
     dirty: bool,
@@ -1846,8 +1874,8 @@ impl App {
         let channel_mask_from_device = prefs.selected_channel_mask == 0;
         // A file that cannot be read must not keep its path in the tab: saving
         // would otherwise overwrite the real configuration with the error row.
-        let (startup_lines, startup_path) = if SCROLL_TEST.load(Ordering::Relaxed) {
-            (synthetic_lines(), None)
+        let (startup_lines, startup_path) = if scroll_test_enabled() {
+            scroll_test_startup()
         } else {
             match CONFIG_PATH.get().cloned().flatten() {
                 Some(path) => match load_config_lines(&path.to_string_lossy()) {
@@ -1883,7 +1911,8 @@ impl App {
             selection_anchor: None,
             labels: Labels::new(),
             menu_labels: Vec::new(),
-            scroll_test_left: if SCROLL_TEST.load(Ordering::Relaxed) { 1500 } else { 0 },
+            #[cfg(debug_assertions)]
+            scroll_test_left: if scroll_test_enabled() { 1500 } else { 0 },
             doc_path: startup_path,
             dirty: false,
             edit: None,
@@ -1893,7 +1922,7 @@ impl App {
             analysis_curve: None,
             analysis_generation: 0,
             show_toolbar,
-            show_analysis: !SCROLL_TEST.load(Ordering::Relaxed) && prefs.show_analysis,
+            show_analysis: !scroll_test_enabled() && prefs.show_analysis,
             channel_names,
             drag: None,
             drag_moved: false,
@@ -1951,7 +1980,7 @@ impl App {
             selection_anchor: None,
             dirty: false,
         });
-        if live_mode != LiveMode::Off && !SCROLL_TEST.load(Ordering::Relaxed) {
+        if live_mode != LiveMode::Off && !scroll_test_enabled() {
             // Adopt the list published by an earlier session, so the title marks
             // the live document and a first switch does not rewrite it needlessly.
             if let Some(device) = &app.selected_device {
@@ -1984,7 +2013,7 @@ impl App {
     /// mode is off the manifest is never touched, which keeps the original
     /// "always read config.txt" behaviour.
     unsafe fn publish_live_files(&mut self, hwnd: HWND) {
-        if SCROLL_TEST.load(Ordering::Relaxed) {
+        if scroll_test_enabled() {
             return;
         }
         let guid = match self.selected_device.as_ref() {
@@ -5866,6 +5895,7 @@ impl App {
         let _ = InvalidateRect(Some(hwnd), None, false);
     }
 
+    #[cfg(debug_assertions)]
     fn scroll_test_tick(&mut self) -> bool {
         if self.scroll_test_left == 0 {
             true
@@ -7390,7 +7420,7 @@ unsafe fn launch_sibling(name: &str) {
 }
 
 unsafe fn startup_checks(hwnd: HWND) {
-    if SKIP_CHECKS.load(Ordering::Relaxed) || SCROLL_TEST.load(Ordering::Relaxed) {
+    if SKIP_CHECKS.load(Ordering::Relaxed) || scroll_test_enabled() {
         return;
     }
     // Without the registered configuration path the APO engine never loads a
@@ -7469,7 +7499,8 @@ unsafe extern "system" fn main_window_proc(
                 state.sync_live_menu(hwnd);
                 SetTimer(Some(hwnd), TIMER_ANALYSIS, 100, None);
             }
-            if SCROLL_TEST.load(Ordering::Relaxed) {
+            #[cfg(debug_assertions)]
+            if scroll_test_enabled() {
                 SetTimer(Some(hwnd), TIMER_SCROLL_TEST, 10, None);
             }
             LRESULT(0)
@@ -7672,22 +7703,26 @@ unsafe extern "system" fn main_window_proc(
             LRESULT(0)
         }
         WM_TIMER => {
-            if wparam.0 == TIMER_SCROLL_TEST {
-                let finished = app(hwnd)
-                    .map(|state| state.scroll_test_tick())
-                    .unwrap_or(true);
-                if finished {
-                    let _ = KillTimer(Some(hwnd), TIMER_SCROLL_TEST);
-                    let _ = PostMessageW(Some(hwnd), WM_CLOSE, WPARAM(0), LPARAM(0));
-                } else {
-                    let _ = SendMessageW(
-                        hwnd,
-                        WM_VSCROLL,
-                        Some(WPARAM(SB_LINEDOWN.0 as usize)),
-                        Some(LPARAM(0)),
-                    );
+            #[cfg(debug_assertions)]
+            {
+                if wparam.0 == TIMER_SCROLL_TEST {
+                    let finished = app(hwnd)
+                        .map(|state| state.scroll_test_tick())
+                        .unwrap_or(true);
+                    if finished {
+                        let _ = KillTimer(Some(hwnd), TIMER_SCROLL_TEST);
+                        let _ = PostMessageW(Some(hwnd), WM_CLOSE, WPARAM(0), LPARAM(0));
+                    } else {
+                        let _ = SendMessageW(
+                            hwnd,
+                            WM_VSCROLL,
+                            Some(WPARAM(SB_LINEDOWN.0 as usize)),
+                            Some(LPARAM(0)),
+                        );
+                    }
                 }
-            } else if wparam.0 == TIMER_ANALYSIS {
+            }
+            if wparam.0 == TIMER_ANALYSIS {
                 if let Some(state) = app(hwnd) {
                     state.poll_analysis(hwnd);
                     let ids = state.hotkeys.poll();
@@ -7843,8 +7878,11 @@ unsafe extern "system" fn main_window_proc(
 
 fn main() -> windows::core::Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let synthetic = args.iter().any(|argument| argument == "--scroll-test");
-    SCROLL_TEST.store(synthetic, Ordering::Relaxed);
+    #[cfg(debug_assertions)]
+    {
+        let synthetic = args.iter().any(|argument| argument == "--scroll-test");
+        SCROLL_TEST.store(synthetic, Ordering::Relaxed);
+    }
     SKIP_CHECKS.store(
         args.iter().any(|argument| argument == "--no-checks"),
         Ordering::Relaxed,
@@ -7932,7 +7970,7 @@ fn main() -> windows::core::Result<()> {
         let _ = AppendMenuW(
             view,
             MF_STRING
-                | check_flag(!SCROLL_TEST.load(Ordering::Relaxed) && window_prefs.show_analysis),
+                | check_flag(!scroll_test_enabled() && window_prefs.show_analysis),
             122,
             menu_text(&mut menu_texts, "Analysis panel"),
         );
