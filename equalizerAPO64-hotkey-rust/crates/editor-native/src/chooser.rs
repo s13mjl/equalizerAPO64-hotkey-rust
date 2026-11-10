@@ -1,5 +1,6 @@
 //! Modal check-list dialog used by the Channel and Device row editors.
 
+use eapo_editor_core::i18n;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::OnceLock;
@@ -304,7 +305,7 @@ unsafe fn build_controls(hwnd: HWND, state: &mut ChooserState) {
     let _ = create_control(
         hwnd,
         w!("BUTTON"),
-        "OK",
+        &i18n::tr("OK"),
         BS_DEFPUSHBUTTON,
         client.right - scale(190, dpi),
         bottom,
@@ -316,7 +317,7 @@ unsafe fn build_controls(hwnd: HWND, state: &mut ChooserState) {
     let _ = create_control(
         hwnd,
         w!("BUTTON"),
-        "Cancel",
+        &i18n::tr("Cancel"),
         0,
         client.right - scale(100, dpi),
         bottom,
