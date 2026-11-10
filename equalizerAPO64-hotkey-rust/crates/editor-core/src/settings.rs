@@ -372,6 +372,54 @@ pub fn load_row_hotkeys(
     result
 }
 
+/// Reads the complete per-row state (GUI preferences and the hotkey field) so
+/// the native frontend can keep both while materializing rows lazily.
+pub fn load_row_state(
+    config_path: &str,
+) -> std::collections::HashMap<usize, (String, serde_json::Map<String, JsonValue>)> {
+    let mut result = std::collections::HashMap::new();
+    if config_path.is_empty() {
+        return result;
+    }
+    let key = file_pref_key(config_path);
+    let Ok(lines) = eapo_common::registry_helper::read_multi_value(&key, "rowPrefs") else {
+        return result;
+    };
+    for line in lines {
+        let Some((number, rest)) = line.split_once(':') else { continue };
+        let Some((command, json)) = rest.split_once(':') else { continue };
+        let Ok(index) = number.parse::<usize>() else { continue };
+        if let Ok(JsonValue::Object(map)) = serde_json::from_str::<JsonValue>(json) {
+            result.insert(index, (command.to_string(), map));
+        }
+    }
+    result
+}
+
+/// Writes the complete per-row state.  Entries are keyed by row number and
+/// command, exactly like the C++ `rowPrefs` format.
+pub fn save_row_state(
+    config_path: &str,
+    entries: &[(usize, String, serde_json::Map<String, JsonValue>)],
+) {
+    if config_path.is_empty() {
+        return;
+    }
+    let key = file_pref_key(config_path);
+    let max_index = entries.iter().map(|(index, _, _)| *index).max().unwrap_or(0);
+    let mut lines = Vec::new();
+    for (index, command, map) in entries {
+        if *index == 0 || *index > max_index || map.is_empty() {
+            continue;
+        }
+        let json = serde_json::to_string(&JsonValue::Object(map.clone()))
+            .unwrap_or_else(|_| "{}".into());
+        lines.push(format!("{index}:{command}:{json}"));
+    }
+    let _ = eapo_common::registry_helper::create_key(&key);
+    let _ = eapo_common::registry_helper::write_multi_value(&key, "rowPrefs", &lines);
+}
+
 /// Merges hotkey assignments into the per-file `rowPrefs` values, preserving
 /// every other preference stored for the row.
 pub fn save_row_hotkeys(

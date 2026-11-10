@@ -534,6 +534,7 @@ struct Row {
     enabled: bool,
     item: Option<Box<FilterItem>>,
     hotkey: Option<KeySequence>,
+    prefs: serde_json::Map<String, serde_json::Value>,
     /// First node row shown in the GraphicEQ table.
     geq_table_top: usize,
 }
@@ -2087,7 +2088,7 @@ impl App {
             .filter_map(|(row, key)| row.hotkey.map(|sequence| (key, sequence)))
             .collect();
         settings::save_hotkey_bindings(&path, &bindings);
-        let updates: Vec<(usize, String, Option<KeySequence>)> = self
+        let updates: Vec<(usize, String, serde_json::Map<String, serde_json::Value>)> = self
             .rows
             .iter()
             .enumerate()
@@ -2099,10 +2100,18 @@ impl App {
                     .unwrap_or("")
                     .trim()
                     .to_string();
-                (index + 1, command, row.hotkey)
+                let mut prefs = row.prefs.clone();
+                prefs.remove("hotkey");
+                if let Some(sequence) = row.hotkey {
+                    prefs.insert(
+                        "hotkey".to_string(),
+                        serde_json::Value::String(sequence.to_string_qt()),
+                    );
+                }
+                (index + 1, command, prefs)
             })
             .collect();
-        settings::save_row_hotkeys(&path, &updates);
+        settings::save_row_state(&path, &updates);
     }
 
     unsafe fn set_hotkey_for_row(&mut self, hwnd: HWND, row: usize) {
@@ -2596,13 +2605,25 @@ impl App {
     fn set_lines(&mut self, lines: Vec<String>) {
         self.rows.clear();
         self.rows.reserve(lines.len());
-        for line in lines {
+        let row_state = self
+            .doc_path
+            .as_ref()
+            .map(|path| settings::load_row_state(&path.to_string_lossy()))
+            .unwrap_or_default();
+        for (position, line) in lines.into_iter().enumerate() {
             let structural = parse_line(&line);
             let kind = structural.kind;
             let enabled = structural.enabled;
             let height = row_height(kind, self.dpi);
             let uid = self.next_uid;
             self.next_uid += 1;
+            let command = line.split(':').next().unwrap_or("").trim();
+            let mut prefs = row_state
+                .get(&(position + 1))
+                .filter(|(stored, _)| stored == command)
+                .map(|(_, prefs)| prefs.clone())
+                .unwrap_or_default();
+            prefs.remove("hotkey");
             self.rows.push(Row {
                 uid,
                 line,
@@ -2611,6 +2632,7 @@ impl App {
                 enabled,
                 item: None,
                 hotkey: None,
+                prefs,
                 geq_table_top: 0,
             });
         }
@@ -2658,7 +2680,10 @@ impl App {
         let uid = self.rows[index].uid;
         let kind = self.rows[index].kind;
         let line = self.rows[index].line.clone();
+        let prefs = self.rows[index].prefs.clone();
         let mut item = FilterItem::new(uid, line, &context);
+        item.prefs = prefs;
+        item.rebuild(&context);
         if kind == FilterKind::Loudness {
             if let Some(volume) = self.master_volume {
                 if let Some(FilterEditor::Loudness {
@@ -2703,14 +2728,20 @@ impl App {
         if index >= self.rows.len() {
             return;
         }
-        if let Some(item) = self.rows[index].item.as_mut() {
+        let Some((line, prefs)) = self.rows[index].item.as_mut().map(|item| {
             item.sync_from_editor();
             let line = item.line.clone();
-            self.apply_row_line(index, line);
-            self.dirty = true;
-            unsafe {
-                self.update_title(hwnd);
-            }
+            let mut prefs = item.collect_prefs();
+            prefs.remove("hotkey");
+            (line, prefs)
+        }) else {
+            return;
+        };
+        self.rows[index].prefs = prefs;
+        self.apply_row_line(index, line);
+        self.dirty = true;
+        unsafe {
+            self.update_title(hwnd);
         }
     }
 
@@ -2952,6 +2983,9 @@ impl App {
         }
         prefs.save();
         self.prefs = prefs;
+        // Persist the per-row GUI preferences together with the hotkeys so
+        // VST embedding, GEQ zoom and similar state survives a restart.
+        self.save_hotkeys();
     }
 
     fn apply_row_line(&mut self, index: usize, line: String) {
@@ -3399,6 +3433,7 @@ impl App {
                 enabled: structural.enabled,
                 item: None,
                 hotkey: None,
+                prefs: serde_json::Map::new(),
                 geq_table_top: 0,
             },
         );
@@ -3514,6 +3549,7 @@ impl App {
                     enabled,
                     item: None,
                     hotkey: None,
+                    prefs: serde_json::Map::new(),
                     geq_table_top: 0,
                 },
             );
