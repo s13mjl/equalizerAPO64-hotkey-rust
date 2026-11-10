@@ -1107,6 +1107,8 @@ fn graphic_eq_ui(
                         ui.label("");
                         ui.end_row();
                         let mut remove = None;
+                        let mut sort_needed = false;
+                        let mut edited = None;
                         for i in 0..g.nodes.len() {
                             let selected = g.selected.contains(&i);
                             let mut changed_row = false;
@@ -1122,6 +1124,8 @@ fn graphic_eq_ui(
                                 }
                                 if response.changed() {
                                     g.nodes[i].freq = freq;
+                                    edited = Some((freq, g.nodes[i].db_gain));
+                                    sort_needed = true;
                                     changed_row = true;
                                 }
                             } else if ui
@@ -1143,6 +1147,11 @@ fn graphic_eq_ui(
                                 .changed()
                             {
                                 g.nodes[i].db_gain = db;
+                                if let Some((freq, _)) = edited {
+                                    if (freq - g.nodes[i].freq).abs() < 1e-9 {
+                                        edited = Some((freq, db));
+                                    }
+                                }
                                 changed_row = true;
                             }
                             if ui.small_button("x").clicked() {
@@ -1150,8 +1159,18 @@ fn graphic_eq_ui(
                             }
                             ui.end_row();
                             if changed_row {
-                                g.sort_nodes();
                                 actions.changed = true;
+                            }
+                        }
+                        if sort_needed {
+                            g.sort_nodes();
+                            if let Some((freq, gain)) = edited {
+                                if let Some(position) = g.nodes.iter().position(|node| {
+                                    (node.freq - freq).abs() < 1e-9
+                                        && (node.db_gain - gain).abs() < 1e-9
+                                }) {
+                                    g.selected = vec![position];
+                                }
                             }
                         }
                         if let Some(i) = remove {
