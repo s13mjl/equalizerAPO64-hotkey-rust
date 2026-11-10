@@ -178,11 +178,11 @@ impl DeviceTestThread {
         }
         let _ = self
             .sender
-            .send(TestEvent::Log("Restarting audio service...".to_string()));
+            .send(TestEvent::Log(crate::i18n::tr("Restarting audio service...")));
         if let Err(error) = service_helper::restart_service("AudioSrv") {
             let _ = self
                 .sender
-                .send(TestEvent::LogError("Restart failed.".to_string()));
+                .send(TestEvent::LogError(crate::i18n::tr("Restart failed.")));
             let _ = self.sender.send(TestEvent::Abort(error.to_string(), -1));
             return;
         }
@@ -201,7 +201,7 @@ impl DeviceTestThread {
 
             let _ = self
                 .sender
-                .send(TestEvent::Log("Checking APO installation...".to_string()));
+                .send(TestEvent::Log(crate::i18n::tr("Checking APO installation...")));
             let pipe_name = DEVICE_TEST_PIPE_NAME;
             let receive_thread = ReceiveThread::new(pipe_name);
 
@@ -484,7 +484,7 @@ impl DeviceTestThread {
                 if !remaining_devices.is_empty() {
                     let _ = self
                         .sender
-                        .send(TestEvent::Log("Trying other configurations...".to_string()));
+                        .send(TestEvent::Log(crate::i18n::tr("Trying other configurations...")));
                 }
 
                 if self.cancel.load(Ordering::Relaxed) {
@@ -497,11 +497,11 @@ impl DeviceTestThread {
                 }
                 let _ = self
                     .sender
-                    .send(TestEvent::Log("Restarting audio service...".to_string()));
+                    .send(TestEvent::Log(crate::i18n::tr("Restarting audio service...")));
                 if let Err(error) = service_helper::restart_service("AudioSrv") {
                     let _ = self
                         .sender
-                        .send(TestEvent::LogError("Restart failed.".to_string()));
+                        .send(TestEvent::LogError(crate::i18n::tr("Restart failed.")));
                     let _ = self.sender.send(TestEvent::Abort(error.to_string(), -1));
                     drop(receive_thread);
                     let _ = registry_helper::delete_value(
