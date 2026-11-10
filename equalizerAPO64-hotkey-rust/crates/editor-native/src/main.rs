@@ -916,6 +916,18 @@ fn point_in(rect: &RECT, x: i32, y: i32) -> bool {
     x >= rect.left && x < rect.right && y >= rect.top && y < rect.bottom
 }
 
+/// Compares two paths the way Windows does: canonical form when available,
+/// otherwise a case-insensitive string comparison.
+fn same_file(left: &std::path::Path, right: &std::path::Path) -> bool {
+    if let (Ok(left), Ok(right)) = (left.canonicalize(), right.canonicalize()) {
+        return left == right;
+    }
+    left == right
+        || left
+            .to_string_lossy()
+            .eq_ignore_ascii_case(&right.to_string_lossy())
+}
+
 thread_local! {
     /// Cursor position (client coordinates) used by free paint helpers to
     /// highlight the control under the mouse.
@@ -2183,10 +2195,18 @@ impl App {
         }
         self.commit_edit(hwnd, true);
         self.capture_active_tab();
-        let mut last = self.active_tab;
+        let mut last = Some(self.active_tab);
         for path in paths {
             let path_string = path.to_string_lossy().into_owned();
             settings::push_recent(&mut self.recent_files, &path_string);
+            if let Some(index) = self
+                .tabs
+                .iter()
+                .position(|tab| tab.path.as_ref().is_some_and(|open| same_file(open, &path)))
+            {
+                last = Some(index);
+                continue;
+            }
             let lines = match load_config_lines(&path_string) {
                 Ok(lines) => lines,
                 Err(error) => vec![format!("(cannot read {}: {error})", path.display())],
@@ -2203,9 +2223,11 @@ impl App {
                 selected: None,
                 dirty: false,
             });
-            last = self.tabs.len() - 1;
+            last = Some(self.tabs.len() - 1);
         }
-        self.load_tab(hwnd, last);
+        if let Some(index) = last {
+            self.load_tab(hwnd, index);
+        }
     }
 
     unsafe fn open_dialog(&mut self, hwnd: HWND) {
