@@ -3855,9 +3855,8 @@ impl App {
         let mut tab_x = scale(8, dpi);
         let mut rects = Vec::with_capacity(self.tabs.len());
         for (index, tab) in self.tabs.iter().enumerate() {
-            let title_len = tab.title.chars().count() as i32 + if tab.dirty { 2 } else { 0 };
-            let width = (title_len * scale(7, dpi) + scale(34, dpi))
-                .clamp(scale(90, dpi), scale(240, dpi));
+            let text_width = text_width_estimate(&tab.title) + if tab.dirty { 14 } else { 0 };
+            let width = scale(text_width + 34, dpi).clamp(scale(90, dpi), scale(240, dpi));
             rects.push((
                 index,
                 RECT {
@@ -5768,13 +5767,25 @@ impl App {
             );
             self.frame(hdc, rect.left, rect.top, rect.right, rect.bottom);
             SelectObject(hdc, HGDIOBJ(if active { self.bold.0 } else { self.body.0 }));
+            let available = ((rect.right - rect.left - scale(24, self.dpi)) as f64 * 96.0
+                / self.dpi as f64) as i32;
+            let shown = fit_text(&title, available.max(16));
+            let saved = SaveDC(hdc);
+            let _ = IntersectClipRect(
+                hdc,
+                rect.left + scale(4, self.dpi),
+                rect.top,
+                rect.right - scale(20, self.dpi),
+                rect.bottom,
+            );
             draw_text(
                 hdc,
                 rect.left + scale(8, self.dpi),
                 tab_top + scale(6, self.dpi),
-                &wide(&shorten(&title, 28)),
+                &wide(&shown),
                 if active { TEXT } else { MUTED },
             );
+            let _ = RestoreDC(hdc, saved);
             draw_text(
                 hdc,
                 rect.right - scale(16, self.dpi),
@@ -5822,8 +5833,17 @@ impl App {
             if self.is_hot_rect(&rect) { HOVER } else { WHITE },
         );
         self.frame(hdc, x, y, x + w, y + h);
-        draw_text(hdc, x + scale(6, self.dpi), y + scale(4, self.dpi), label, TEXT);
         let arrow_x = x + w - scale(14, self.dpi);
+        let saved = SaveDC(hdc);
+        let _ = IntersectClipRect(
+            hdc,
+            x + scale(2, self.dpi),
+            y,
+            arrow_x - scale(2, self.dpi),
+            y + h,
+        );
+        draw_text(hdc, x + scale(6, self.dpi), y + scale(4, self.dpi), label, TEXT);
+        let _ = RestoreDC(hdc, saved);
         let arrow_y = y + h / 2 - scale(2, self.dpi);
         for row in 0..scale(4, self.dpi) {
             let half = scale(4, self.dpi) - row;
