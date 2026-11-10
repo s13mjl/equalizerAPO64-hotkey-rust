@@ -6191,6 +6191,7 @@ impl App {
                     &number[..number_len],
                     MUTED,
                 );
+                SelectObject(hdc, HGDIOBJ(self.body.0));
 
                 let box_size = scale(12, self.dpi);
                 let box_x = scale(20, self.dpi);
