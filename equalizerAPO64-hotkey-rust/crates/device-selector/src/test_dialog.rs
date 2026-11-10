@@ -84,15 +84,20 @@ impl DeviceTestDialog {
         let cancel = Arc::new(AtomicBool::new(false));
         let devices: Vec<Arc<DeviceAPOInfo>> =
             entries.iter().map(|entry| entry.info.clone()).collect();
+        let idle = devices.is_empty();
         let thread = DeviceTestThread::new(devices, sender.clone(), cancel.clone());
-        thread.start();
+        if !idle {
+            // Restarting the audio service for an empty device list would be
+            // pointless and would still interrupt playback.
+            thread.start();
+        }
 
         Self {
             entries,
             groups,
             item_map,
             log_lines: Vec::new(),
-            thread_finished: false,
+            thread_finished: idle,
             sender,
             receiver,
             cancel,
