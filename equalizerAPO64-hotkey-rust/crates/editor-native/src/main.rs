@@ -3804,6 +3804,34 @@ impl App {
         self.tab_top() + scale(33, self.dpi)
     }
 
+    /// Layout of the three toolbar combos, shared by painting and hit tests.
+    fn toolbar_layout(&self) -> [RECT; 3] {
+        let dpi = self.dpi;
+        let top = scale(6, dpi);
+        let bottom = top + scale(22, dpi);
+        let text_x = scale(200, dpi);
+        let text_width = scale(text_width_estimate(&i18n::tr("Instant mode")), dpi);
+        let instant = RECT {
+            left: scale(180, dpi),
+            top,
+            right: text_x + text_width + scale(8, dpi),
+            bottom,
+        };
+        let device = RECT {
+            left: instant.right + scale(8, dpi),
+            top,
+            right: instant.right + scale(8, dpi) + scale(128, dpi),
+            bottom,
+        };
+        let channel = RECT {
+            left: device.right + scale(8, dpi),
+            top,
+            right: device.right + scale(8, dpi) + scale(112, dpi),
+            bottom,
+        };
+        [instant, device, channel]
+    }
+
     /// Top of the document tab strip (the toolbar above it can be hidden).
     fn tab_top(&self) -> i32 {
         if self.show_toolbar {
@@ -3873,13 +3901,7 @@ impl App {
                 }
                 left += scale(58, dpi);
             }
-            for (l, r) in [(180, 260), (256, 384), (392, 504)] {
-                let rect = RECT {
-                    left: scale(l, dpi),
-                    top,
-                    right: scale(r, dpi),
-                    bottom,
-                };
+            for rect in self.toolbar_layout() {
                 if point_in(&rect, x, y) {
                     return Some(rect);
                 }
@@ -4390,16 +4412,17 @@ impl App {
                 self.open_dialog(hwnd);
             } else if x >= scale(124, self.dpi) && x < save_right {
                 self.save(hwnd);
-            } else if x >= scale(180, self.dpi) && x < scale(260, self.dpi) {
-                self.instant_mode = !self.instant_mode;
-                let _ = InvalidateRect(Some(hwnd), None, false);
-            } else if x >= scale(256, self.dpi) && x < scale(384, self.dpi) {
-                if self.menu_toggle_allowed(1) {
-                    self.open_device_menu(hwnd, scale(256, self.dpi), scale(30, self.dpi));
-                }
-            } else if x >= scale(392, self.dpi) && x < scale(504, self.dpi) {
-                if self.menu_toggle_allowed(2) {
-                    self.open_channel_menu(hwnd, scale(392, self.dpi), scale(30, self.dpi));
+            } else {
+                let layout = self.toolbar_layout();
+                if point_in(&layout[0], x, y) {
+                    self.instant_mode = !self.instant_mode;
+                    let _ = InvalidateRect(Some(hwnd), None, false);
+                } else if point_in(&layout[1], x, y) {
+                    if self.menu_toggle_allowed(1) {
+                        self.open_device_menu(hwnd, layout[1].left, scale(30, self.dpi));
+                    }
+                } else if point_in(&layout[2], x, y) && self.menu_toggle_allowed(2) {
+                    self.open_channel_menu(hwnd, layout[2].left, scale(30, self.dpi));
                 }
             }
             return;
@@ -5656,12 +5679,7 @@ impl App {
                 x += scale(58, self.dpi);
             }
 
-            let instant_rect = RECT {
-                left: scale(180, self.dpi),
-                top: button_y,
-                right: scale(260, self.dpi),
-                bottom: button_y + button_h,
-            };
+            let instant_rect = self.toolbar_layout()[0];
             if self.is_hot_rect(&instant_rect) {
                 fill(
                     hdc,
@@ -5689,9 +5707,9 @@ impl App {
             }
             x += check_size + scale(5, self.dpi);
             draw_text(hdc, x, button_y + scale(4, self.dpi), &self.labels.instant, TEXT);
-            x += scale(56, self.dpi);
 
-            let combo_w = scale(128, self.dpi);
+            let layout = self.toolbar_layout();
+            let device_rect = layout[1];
             let device_text = self
                 .selected_device
                 .as_ref()
@@ -5705,13 +5723,13 @@ impl App {
                 .unwrap_or_else(|| "No device".to_string());
             self.paint_combo(
                 hdc,
-                x,
+                device_rect.left,
                 button_y,
-                combo_w,
+                device_rect.right - device_rect.left,
                 button_h,
                 &wide(&shorten(&device_text, 20)),
             );
-            x += combo_w + scale(8, self.dpi);
+            let channel_rect = layout[2];
             let channel_text = if self.channel_names.is_empty() {
                 "From device".to_string()
             } else {
@@ -5719,9 +5737,9 @@ impl App {
             };
             self.paint_combo(
                 hdc,
-                x,
+                channel_rect.left,
                 button_y,
-                scale(112, self.dpi),
+                channel_rect.right - channel_rect.left,
                 button_h,
                 &wide(&shorten(&channel_text, 14)),
             );
