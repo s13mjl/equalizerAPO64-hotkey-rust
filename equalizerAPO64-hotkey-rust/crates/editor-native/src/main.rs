@@ -7198,6 +7198,7 @@ unsafe extern "system" fn main_window_proc(
         }
         WM_SIZE => {
             if let Some(state) = app(hwnd) {
+                state.commit_value_edit(hwnd, true);
                 state.update_scrollbar(hwnd);
             }
             let _ = InvalidateRect(Some(hwnd), None, false);
@@ -7384,6 +7385,7 @@ unsafe extern "system" fn main_window_proc(
                 SWP_NOZORDER | SWP_NOACTIVATE,
             );
             if let Some(state) = app(hwnd) {
+                state.commit_value_edit(hwnd, true);
                 state.commit_edit(hwnd, true);
                 state.set_dpi(dpi);
                 state.update_scrollbar(hwnd);
