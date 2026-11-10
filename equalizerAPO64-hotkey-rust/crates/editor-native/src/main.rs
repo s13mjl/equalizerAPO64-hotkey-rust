@@ -196,7 +196,6 @@ const BORDER: COLORREF = COLORREF(0x00C8_C8C8);
 const TEXT: COLORREF = COLORREF(0x0020_2020);
 const MUTED: COLORREF = COLORREF(0x0070_7070);
 const SELECTED: COLORREF = COLORREF(0x00FF_E8_D8);
-const EXPANDED_BG: COLORREF = COLORREF(0x00F2_F2F2);
 const BAR: COLORREF = COLORREF(0x00C0_8040);
 const PLOT_BG: COLORREF = COLORREF(0x00FF_FFFF);
 const GRID: COLORREF = COLORREF(0x00E0_E0E0);
@@ -6411,12 +6410,9 @@ impl App {
                 .and_then(|path| self.vst_readable(path));
             let row = &self.rows[index];
             let height = row.height as i32;
-            let expanded = false;
             if y + height > chrome {
                 let background = if self.selection.contains(&index) {
                     SELECTED
-                } else if expanded {
-                    EXPANDED_BG
                 } else {
                     WHITE
                 };
@@ -6598,19 +6594,6 @@ impl App {
                         &wide(&hotkey.to_string_qt()),
                         MUTED,
                     );
-                }
-
-                if expanded {
-                    let bar_top = y + scale(28, self.dpi);
-                    let bar_x = scale(46, self.dpi);
-                    let bar_w = scale(7, self.dpi);
-                    let gap = scale(3, self.dpi);
-                    for bar in 0..15usize {
-                        let bar_h = scale(4 + ((index + bar * 7) % 30) as i32, self.dpi);
-                        let left = bar_x + bar as i32 * (bar_w + gap);
-                        let bottom = (bar_top + scale(32, self.dpi)).min(y + height - scale(4, self.dpi));
-                        fill(hdc, left, bottom - bar_h, left + bar_w, bottom, BAR);
-                    }
                 }
 
                 fill(
