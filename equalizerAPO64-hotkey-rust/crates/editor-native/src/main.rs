@@ -3680,6 +3680,7 @@ impl App {
             MENU_TOGGLE => {
                 if let Some(index) = self.selected {
                     self.toggle_row(hwnd, index);
+                    self.start_analysis();
                 }
             }
             MENU_EDIT => {
@@ -4434,14 +4435,31 @@ impl App {
             return;
         }
         if key == VK_SPACE.0 {
-            if let Some(index) = self.selected {
-                let ctrl = GetKeyState(VK_CONTROL.0 as i32) < 0;
-                if ctrl && self.selection.remove(&index) {
-                    // toggled off
-                } else {
-                    self.selection.insert(index);
+            let ctrl = GetKeyState(VK_CONTROL.0 as i32) < 0;
+            if ctrl {
+                // Ctrl+Space toggles the multi-selection, like Ctrl+click.
+                if let Some(index) = self.selected {
+                    if !self.selection.remove(&index) {
+                        self.selection.insert(index);
+                    }
+                    let _ = InvalidateRect(Some(hwnd), None, false);
                 }
-                let _ = InvalidateRect(Some(hwnd), None, false);
+            } else {
+                // Space toggles the enable state of the current or selected
+                // filters, which is what users expect from the ON/OFF prefix.
+                let mut targets: Vec<usize> = if self.selection.is_empty() {
+                    self.selected.into_iter().collect()
+                } else {
+                    self.selection.iter().copied().collect()
+                };
+                targets.sort_unstable();
+                let toggled = !targets.is_empty();
+                for index in targets {
+                    self.toggle_row(hwnd, index);
+                }
+                if toggled {
+                    self.start_analysis();
+                }
             }
             return;
         }
