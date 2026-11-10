@@ -179,6 +179,14 @@ impl Language {
         )
     }
 
+    pub fn insufficient_space(&self) -> &'static str {
+        tr!(
+            self,
+            "There is not enough free disk space for the installation.",
+            "Auf dem Ziellaufwerk ist nicht genügend Speicherplatz für die Installation vorhanden."
+        )
+    }
+
     pub fn start_menu_title(&self) -> &'static str {
         tr!(self, "Choose Start Menu Folder", "Startmenü-Ordner wählen")
     }

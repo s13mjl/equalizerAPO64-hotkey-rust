@@ -514,9 +514,15 @@ impl SetupApp {
                     } else {
                         let available = util::free_space(path);
                         data.install_dir = value;
-                        data.validation_error = None;
                         data.available_space = available;
-                        true
+                        if data.required_space > 0 && available < data.required_space {
+                            data.validation_error =
+                                Some(data.language.insufficient_space().to_string());
+                            false
+                        } else {
+                            data.validation_error = None;
+                            true
+                        }
                     }
                 } else {
                     false
