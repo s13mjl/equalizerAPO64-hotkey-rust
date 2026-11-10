@@ -215,15 +215,16 @@ impl SelectorApp {
                         .spacing([18.0, 4.0])
                         .striped(false)
                         .show(ui, |ui| {
-                            ui.label(RichText::new("Connector").strong());
-                            ui.label(RichText::new("Device").strong());
-                            ui.label(RichText::new("Status").strong());
+                            ui.label(RichText::new(crate::i18n::tr("Connector")).strong());
+                            ui.label(RichText::new(crate::i18n::tr("Device")).strong());
+                            ui.label(RichText::new(crate::i18n::tr("Status")).strong());
                             ui.end_row();
 
                             for (group_index, group_name) in
                                 ["Playback devices", "Capture devices"].iter().enumerate()
                             {
-                                let header = ui.label(RichText::new(*group_name).strong());
+                                let header =
+                                    ui.label(RichText::new(crate::i18n::tr(group_name)).strong());
                                 if header.clicked() {
                                     self.selected.clear();
                                 }
@@ -255,7 +256,7 @@ impl SelectorApp {
                                     }
                                     connection_response.context_menu(|ui| {
                                         if ui
-                                            .button("Copy Device command to clipboard")
+                                            .button(crate::i18n::tr("Copy Device command to clipboard"))
                                             .clicked()
                                         {
                                             copy_requested = true;
@@ -275,7 +276,7 @@ impl SelectorApp {
                                     }
                                     name_response.context_menu(|ui| {
                                         if ui
-                                            .button("Copy Device command to clipboard")
+                                            .button(crate::i18n::tr("Copy Device command to clipboard"))
                                             .clicked()
                                         {
                                             copy_requested = true;
@@ -297,7 +298,7 @@ impl SelectorApp {
                                     }
                                     status_response.context_menu(|ui| {
                                         if ui
-                                            .button("Copy Device command to clipboard")
+                                            .button(crate::i18n::tr("Copy Device command to clipboard"))
                                             .clicked()
                                         {
                                             copy_requested = true;
@@ -489,7 +490,7 @@ impl SelectorApp {
                     ui.label(crate::i18n::tr("Pre-mix:"));
                 });
                 if ui
-                    .checkbox(&mut state.install_pre_mix, "Install APO")
+                    .checkbox(&mut state.install_pre_mix, crate::i18n::tr("Install APO"))
                     .changed()
                 {
                     changes.push(0);
@@ -497,9 +498,9 @@ impl SelectorApp {
                 if ui
                     .add_enabled(
                         has_original_pre && state.install_pre_mix,
-                        egui::Checkbox::new(&mut use_original_pre, "Use original APO"),
+                        egui::Checkbox::new(&mut use_original_pre, crate::i18n::tr("Use original APO")),
                     )
-                    .on_disabled_hover_text("No original APO detected")
+                    .on_disabled_hover_text(crate::i18n::tr("No original APO detected"))
                     .changed()
                 {
                     state.use_original_apo_pre_mix = use_original_pre;
@@ -535,7 +536,7 @@ impl SelectorApp {
                 if ui
                     .add_enabled(
                         !is_input,
-                        egui::Checkbox::new(&mut state.install_post_mix, "Install APO"),
+                        egui::Checkbox::new(&mut state.install_post_mix, crate::i18n::tr("Install APO")),
                     )
                     .changed()
                 {
@@ -544,7 +545,7 @@ impl SelectorApp {
                 if ui
                     .add_enabled(
                         !is_input && has_original_post && state.install_post_mix,
-                        egui::Checkbox::new(&mut use_original_post, "Use original APO"),
+                        egui::Checkbox::new(&mut use_original_post, crate::i18n::tr("Use original APO")),
                     )
                     .changed()
                 {
@@ -554,7 +555,7 @@ impl SelectorApp {
                 if ui
                     .checkbox(
                         &mut state.allow_silent_buffer_modification,
-                        "Allow silent buffer modification",
+                        crate::i18n::tr("Allow silent buffer modification"),
                     )
                     .on_hover_text(crate::i18n::tr("Allows to change silent input buffers to audible output buffers, so that delayed audio can be played.
 
@@ -737,11 +738,11 @@ CAUTION: Some sound card drivers can produce unwanted sounds when this is enable
     }
 }
 
-fn install_mode_name(mode: InstallMode) -> &'static str {
+fn install_mode_name(mode: InstallMode) -> String {
     match mode {
-        InstallMode::InstallLfxGfx => "Install as LFX/GFX",
-        InstallMode::InstallSfxMfx => "Install as SFX/MFX",
-        InstallMode::InstallSfxEfx => "Install as SFX/EFX",
+        InstallMode::InstallLfxGfx => crate::i18n::tr("Install as LFX/GFX"),
+        InstallMode::InstallSfxMfx => crate::i18n::tr("Install as SFX/MFX"),
+        InstallMode::InstallSfxEfx => crate::i18n::tr("Install as SFX/EFX"),
     }
 }
 
