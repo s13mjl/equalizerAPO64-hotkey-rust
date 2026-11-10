@@ -4525,6 +4525,7 @@ impl App {
             }
         }
         self.tabs.remove(index);
+        let no_saved_tabs = self.tabs.iter().all(|tab| tab.path.is_none());
         if self.tabs.is_empty() {
             self.tabs.push(TabInfo {
                 title: i18n::tr("Unsaved"),
@@ -4540,6 +4541,13 @@ impl App {
         let next = index.min(self.tabs.len() - 1);
         self.active_tab = usize::MAX;
         self.load_tab(hwnd, next);
+        // Closing the last saved document means the editor no longer follows
+        // any file for this device, so remove the live manifest and let the
+        // engine fall back to its default configuration.
+        if no_saved_tabs && self.live_mode != LiveMode::Off && self.live_published.is_some() {
+            self.clear_live_files();
+            self.update_title(hwnd);
+        }
     }
 
     fn tab_hit(&self, x: i32) -> Option<(usize, bool)> {
