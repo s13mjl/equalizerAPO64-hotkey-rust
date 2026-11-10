@@ -912,6 +912,23 @@ pub fn save_config_file(path: &str, lines: &[String]) -> std::io::Result<()> {
         text.push_str(line);
     }
     let bytes = text.into_bytes();
+
+    // Prefer an atomic replace; fall back to the in-place write when the
+    // reader holds the target without delete sharing.
+    let target = Path::new(path);
+    let parent = target.parent().unwrap_or_else(|| Path::new("."));
+    let name = target
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "config".to_string());
+    let temp = parent.join(format!(".{name}.{}.tmp", std::process::id()));
+    if std::fs::write(&temp, &bytes).is_ok() {
+        if std::fs::rename(&temp, target).is_ok() {
+            return Ok(());
+        }
+        let _ = std::fs::remove_file(&temp);
+    }
+
     let mut attempts = 0;
     loop {
         match std::fs::write(path, &bytes) {
