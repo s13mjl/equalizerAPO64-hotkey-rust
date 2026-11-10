@@ -947,8 +947,9 @@ pub fn system_language() -> Language {
 /// `QString::arg()`.
 pub fn tr_arg(source: &str, args: &[&str]) -> String {
     let mut text = tr(source);
-    for (index, arg) in args.iter().enumerate() {
-        text = text.replace(&format!("%{index}"), arg);
+    // Replace the highest placeholder first so `%1` never consumes `%10`.
+    for index in (0..args.len()).rev() {
+        text = text.replace(&format!("%{index}"), args[index]);
     }
     text
 }
