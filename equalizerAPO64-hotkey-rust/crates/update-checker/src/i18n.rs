@@ -51,6 +51,14 @@ static GERMAN: &[(&str, &str)] = &[
     ("The installed version %0 of Equalizer APO is up to date.", "Die installierte Version %0 von Equalizer APO ist aktuell."),
     ("Update available", "Update verfügbar"),
     ("Yes", "Ja"),
+    ("The update server address is invalid.", "Die Adresse des Update-Servers ist ungültig."),
+    ("Could not initialize the HTTP client.", "Der HTTP-Client konnte nicht initialisiert werden."),
+    ("Could not connect to the update server.", "Die Verbindung zum Update-Server konnte nicht hergestellt werden."),
+    ("Could not create the HTTP request.", "Die HTTP-Anfrage konnte nicht erstellt werden."),
+    ("The update server could not be found.", "Der Update-Server wurde nicht gefunden."),
+    ("The update check failed.", "Die Updateprüfung ist fehlgeschlagen."),
+    ("The update server returned HTTP %0.", "Der Update-Server hat HTTP %0 zurückgegeben."),
+    ("The response is not a JSON object", "Die Antwort ist kein JSON-Objekt"),
 ];
 
 static FRENCH: &[(&str, &str)] = &[
@@ -71,6 +79,14 @@ static FRENCH: &[(&str, &str)] = &[
     ("The installed version %0 of Equalizer APO is up to date.", "La version installée %0 d'Equalizer APO est à jour."),
     ("Update available", "Mise à jour disponible"),
     ("Yes", "Oui"),
+    ("The update server address is invalid.", "L'adresse du serveur de mise à jour est invalide."),
+    ("Could not initialize the HTTP client.", "Impossible d'initialiser le client HTTP."),
+    ("Could not connect to the update server.", "Impossible de se connecter au serveur de mise à jour."),
+    ("Could not create the HTTP request.", "Impossible de créer la requête HTTP."),
+    ("The update server could not be found.", "Le serveur de mise à jour est introuvable."),
+    ("The update check failed.", "La vérification de mise à jour a échoué."),
+    ("The update server returned HTTP %0.", "Le serveur de mise à jour a renvoyé HTTP %0."),
+    ("The response is not a JSON object", "La réponse n'est pas un objet JSON"),
 ];
 
 static CHINESE: &[(&str, &str)] = &[
@@ -92,5 +108,13 @@ static CHINESE: &[(&str, &str)] = &[
     ("The installed version %0 of Equalizer APO is up to date.", "安装的 Equalizer APO %0 已是最新版本。"),
     ("Update available", "更新可用"),
     ("Yes", "是"),
+    ("The update server address is invalid.", "更新服务器地址无效。"),
+    ("Could not initialize the HTTP client.", "无法初始化 HTTP 客户端。"),
+    ("Could not connect to the update server.", "无法连接到更新服务器。"),
+    ("Could not create the HTTP request.", "无法创建 HTTP 请求。"),
+    ("The update server could not be found.", "找不到更新服务器。"),
+    ("The update check failed.", "更新检查失败。"),
+    ("The update server returned HTTP %0.", "更新服务器返回 HTTP %0。"),
+    ("The response is not a JSON object", "响应不是 JSON 对象"),
 ];
 

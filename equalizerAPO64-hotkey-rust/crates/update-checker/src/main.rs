@@ -143,7 +143,7 @@ fn main() {
             std::process::exit(0);
         }
         HttpOutcome::Error(message) => {
-            run_failure_message(&message);
+            run_failure_message(&localize_error(&message));
             std::process::exit(0);
         }
         HttpOutcome::Ok(body) => {
@@ -173,7 +173,7 @@ fn main() {
             match parse_update_document(&text) {
                 Err(message) => {
                     run_failure_message_titled(
-                        &message,
+                        &i18n::tr(&message),
                         &i18n::tr("Error while reading response of update check"),
                     );
                 }
@@ -624,6 +624,28 @@ impl eframe::App for UpdateDialog {
                 }
             });
         });
+    }
+}
+
+fn localize_error(message: &str) -> String {
+    if message == "Invalid URL" {
+        i18n::tr("The update server address is invalid.")
+    } else if message == "Could not initialize WinHTTP" {
+        i18n::tr("Could not initialize the HTTP client.")
+    } else if message == "Could not connect to the update server" {
+        i18n::tr("Could not connect to the update server.")
+    } else if message == "Could not create HTTP request" {
+        i18n::tr("Could not create the HTTP request.")
+    } else if message.starts_with("NAME_NOT_RESOLVED") {
+        i18n::tr("The update server could not be found.")
+    } else if message.starts_with("Error transferring") {
+        let code = message.rsplit("HTTP ").next().unwrap_or("").trim();
+        if code.chars().all(|ch| ch.is_ascii_digit()) && !code.is_empty() {
+            return i18n::tr_arg("The update server returned HTTP %0.", &[code]);
+        }
+        format!("{} ({message})", i18n::tr("The update check failed."))
+    } else {
+        format!("{} ({message})", i18n::tr("The update check failed."))
     }
 }
 
