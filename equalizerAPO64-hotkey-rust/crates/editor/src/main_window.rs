@@ -1248,7 +1248,6 @@ impl EditorApp {
             }
             let active = self.active_tab.min(self.tabs.len() - 1);
             self.active_tab = active;
-            let _ = self.poll_analysis(ctx);
             let config_path = self.tabs[active].config_path.clone();
             let names = self.channel_names.clone();
             let mask = self.channel_mask();
