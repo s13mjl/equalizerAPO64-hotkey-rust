@@ -5895,7 +5895,8 @@ impl App {
                             i18n::tr("Latency:"),
                             result.latency,
                             i18n::tr(" samples"),
-                            result.latency as f64 * 1000.0 / 48000.0
+                            result.latency as f64 * 1000.0
+                                / result.freq_data_sample_rate.max(1) as f64
                         ),
                         TEXT,
                     ),
