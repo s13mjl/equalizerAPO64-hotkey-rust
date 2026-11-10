@@ -5454,20 +5454,26 @@ impl App {
         if over_plot {
             return;
         }
+        let reorder_chrome = self.chrome_height();
+        let reorder_dpi = self.dpi;
         if let Some(reorder) = self.reorder.as_mut() {
             let y = ((lparam.0 >> 16) & 0xFFFF) as u16 as i16 as i32;
-            if (y - reorder.start_y).abs() > scale(4, self.dpi) {
+            let was_active = reorder.active;
+            if (y - reorder.start_y).abs() > scale(4, reorder_dpi) {
                 reorder.active = true;
             }
-            let chrome = self.chrome_height();
-            let content = (y - chrome + self.offset).max(0) as u32;
+            let active_now = reorder.active;
+            let content = (y - reorder_chrome + self.offset).max(0) as u32;
             let drop = self
                 .prefix
                 .partition_point(|&start| start <= content)
                 .saturating_sub(1)
                 .min(self.rows.len());
+            let drop_changed = self.reorder_drop != Some(drop);
             self.reorder_drop = Some(drop);
-            let _ = InvalidateRect(Some(hwnd), None, false);
+            if drop_changed || (!was_active && active_now) {
+                let _ = InvalidateRect(Some(hwnd), None, false);
+            }
             return;
         }
         let Some(drag) = self.drag else {
