@@ -379,6 +379,12 @@ pub fn plot_frame(
                 let local = Vec2::new(h.x - plot.left(), h.y - plot.top());
                 state.zoom_at(scroll, local, plot.size());
             }
+            // Consume the wheel so the surrounding ScrollArea does not also
+            // scroll while the plot is being zoomed.
+            ui.input_mut(|i| {
+                i.raw_scroll_delta.y = 0.0;
+                i.smooth_scroll_delta.y = 0.0;
+            });
         }
     }
 
