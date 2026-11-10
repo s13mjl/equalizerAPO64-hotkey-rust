@@ -643,12 +643,12 @@ impl SetupApp {
             ui.label(format!(
                 "{}: {}",
                 data.language.space_required(),
-                format_size(data.required_space)
+                format_size(data.language, data.required_space)
             ));
             ui.label(format!(
                 "{}: {}",
                 data.language.space_available(),
-                format_size(data.available_space)
+                format_size(data.language, data.available_space)
             ));
             if let Some(validation) = &data.validation_error {
                 ui.add_space(6.0);
@@ -997,7 +997,7 @@ pub fn version_replaced_folder(existing: &str, version: &str) -> String {
         .into_owned()
 }
 
-fn format_size(bytes: u64) -> String {
+fn format_size(language: Language, bytes: u64) -> String {
     const KB: f64 = 1024.0;
     const MB: f64 = 1024.0 * 1024.0;
     const GB: f64 = 1024.0 * 1024.0 * 1024.0;
@@ -1009,7 +1009,10 @@ fn format_size(bytes: u64) -> String {
     } else if value >= KB {
         format!("{:.1} KB", value / KB)
     } else {
-        format!("{bytes} bytes")
+        match language {
+            Language::English => format!("{bytes} bytes"),
+            Language::German => format!("{bytes} Byte"),
+        }
     }
 }
 
@@ -1051,9 +1054,10 @@ mod tests {
 
     #[test]
     fn size_formatting_is_human_readable() {
-        assert_eq!(format_size(512), "512 bytes");
-        assert_eq!(format_size(2048), "2.0 KB");
-        assert_eq!(format_size(3 * 1024 * 1024), "3.0 MB");
-        assert_eq!(format_size(2 * 1024 * 1024 * 1024), "2.0 GB");
+        assert_eq!(format_size(Language::English, 512), "512 bytes");
+        assert_eq!(format_size(Language::German, 512), "512 Byte");
+        assert_eq!(format_size(Language::English, 2048), "2.0 KB");
+        assert_eq!(format_size(Language::English, 3 * 1024 * 1024), "3.0 MB");
+        assert_eq!(format_size(Language::English, 2 * 1024 * 1024 * 1024), "2.0 GB");
     }
 }
