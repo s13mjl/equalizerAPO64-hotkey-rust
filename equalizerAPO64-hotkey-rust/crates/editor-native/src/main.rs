@@ -2125,7 +2125,7 @@ impl App {
             .and_then(|item| item.editor.as_ref())
             .is_none()
         {
-            let text = wide_z("This row does not have a filter editor.");
+            let text = wide_z(&i18n::tr("This row does not have a filter editor."));
             let _ = MessageBoxW(
                 Some(hwnd),
                 PCWSTR(text.as_ptr()),
@@ -2134,7 +2134,7 @@ impl App {
             );
             return;
         }
-        let Some(sequence) = prompt_hotkey(hwnd, "Set filter hotkey", self.rows[row].hotkey) else {
+        let Some(sequence) = prompt_hotkey(hwnd, &i18n::tr("Set filter hotkey"), self.rows[row].hotkey) else {
             return;
         };
         // A held Alt key would otherwise activate the editor menu bar (a
@@ -2146,7 +2146,7 @@ impl App {
         self.hotkeys.unregister_hotkey(&filter_id);
         if let Some(sequence) = sequence {
             if !self.hotkeys.register_hotkey(&filter_id, Some(sequence)) {
-                let message = wide_z("The hotkey could not be registered. It may already be in use.");
+                let message = wide_z(&i18n::tr("The hotkey could not be registered. It may already be in use."));
                 let _ = MessageBoxW(
                     Some(hwnd),
                     PCWSTR(message.as_ptr()),
@@ -2300,9 +2300,9 @@ impl App {
             let lines = match load_config_lines(&path_string) {
                 Ok(lines) => lines,
                 Err(error) => {
-                    let message = wide_z(&format!(
-                        "Could not read {}: {error}",
-                        path.display()
+                    let message = wide_z(&i18n::tr_arg(
+                        "Could not read %0: %1",
+                        &[&path.display().to_string(), &error.to_string()],
                     ));
                     let _ = MessageBoxW(
                         Some(hwnd),
@@ -2340,7 +2340,7 @@ impl App {
         self.commit_value_edit(hwnd, true);
         self.commit_edit(hwnd, true);
         let mut dialog = FileDialog::new()
-            .set_title("Open configuration")
+            .set_title(&i18n::tr("Open configuration"))
             .add_filter("E-APO configurations (*.txt)", &["txt"]);
         if let Some(parent) = self.doc_path.as_ref().and_then(|path| path.parent()) {
             dialog = dialog.set_directory(parent);
@@ -2354,7 +2354,7 @@ impl App {
         self.commit_value_edit(hwnd, true);
         self.commit_edit(hwnd, true);
         let mut dialog = FileDialog::new()
-            .set_title("Save configuration as")
+            .set_title(&i18n::tr("Save configuration as"))
             .add_filter("E-APO configurations (*.txt)", &["txt"]);
         if let Some(path) = &self.doc_path {
             if let Some(parent) = path.parent() {
@@ -2818,7 +2818,10 @@ impl App {
                 true
             }
             Err(error) => {
-                let text = wide_z(&format!("Could not save {}: {error}", path.display()));
+                let text = wide_z(&i18n::tr_arg(
+                    "Could not save %0: %1",
+                    &[&path.display().to_string(), &error.to_string()],
+                ));
                 let _ = MessageBoxW(
                     Some(hwnd),
                     PCWSTR(text.as_ptr()),
@@ -2918,9 +2921,9 @@ impl App {
             if !self.tabs[index].dirty {
                 continue;
             }
-            let title = wide_z(&format!(
-                "Save changes to {} before closing?",
-                self.tabs[index].title
+            let title = wide_z(&i18n::tr_arg(
+                "Save changes to %0 before closing?",
+                &[&self.tabs[index].title],
             ));
             let answer = MessageBoxW(
                 Some(hwnd),
@@ -4460,9 +4463,9 @@ impl App {
         self.commit_edit(hwnd, true);
         self.capture_active_tab();
         if self.tabs[index].dirty {
-            let title = wide_z(&format!(
-                "Save changes to {} before closing?",
-                self.tabs[index].title
+            let title = wide_z(&i18n::tr_arg(
+                "Save changes to %0 before closing?",
+                &[&self.tabs[index].title],
             ));
             let answer = MessageBoxW(
                 Some(hwnd),
@@ -4743,7 +4746,7 @@ impl App {
                     let rects = path_row_rects(dpi, row_y);
                     if point_in(&rects[1], x, mouse_y) {
                         if let Some(chosen) = FileDialog::new()
-                            .set_title("Include configuration file")
+                            .set_title(&i18n::tr("Include configuration file"))
                             .add_filter("Configuration files", &["txt"])
                             .pick_file()
                         {
@@ -4757,7 +4760,7 @@ impl App {
                     let rects = path_row_rects(dpi, row_y);
                     if point_in(&rects[1], x, mouse_y) {
                         if let Some(chosen) = FileDialog::new()
-                            .set_title("Select impulse response")
+                            .set_title(&i18n::tr("Select impulse response"))
                             .add_filter("Impulse responses", &["wav", "flac", "ogg"])
                             .pick_file()
                         {
@@ -4772,7 +4775,14 @@ impl App {
                     let actions = vst_action_rects(dpi, row_y);
                     if point_in(&rects[0], x, mouse_y) {
                         let current = vst.path.clone();
-                        if let Some(text) = prompt_text(hwnd, "VST plugin path", &current) {
+                        if let Some(text) = prompt_text(
+                            hwnd,
+                            &i18n::tr("VST plugin path"),
+                            &i18n::tr(
+                                "Enter the VST plugin path (file name or absolute path):",
+                            ),
+                            &current,
+                        ) {
                             vst.path = text.trim().to_string();
                             vst_editor::refresh_plugin_status(vst);
                             vst_path_changed = true;
@@ -4781,7 +4791,7 @@ impl App {
                         }
                     } else if point_in(&rects[1], x, mouse_y) {
                         if let Some(chosen) = FileDialog::new()
-                            .set_title("Select VST plugin")
+                            .set_title(&i18n::tr("Select VST plugin"))
                             .add_filter("VST plugins", &["dll"])
                             .pick_file()
                         {
@@ -6552,6 +6562,7 @@ impl Drop for App {
 struct PromptState {
     edit: HWND,
     initial: String,
+    hint: String,
     result: Rc<RefCell<Option<String>>>,
     dpi: u32,
     font: HFONT,
@@ -6647,21 +6658,21 @@ unsafe extern "system" fn prompt_wndproc(
             fill(hdc, 0, 0, client.right, client.bottom, WHITE);
             let state = (GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut PromptState).as_mut();
             let dpi = state.as_ref().map(|state| state.dpi).unwrap_or(96);
-            if let Some(state) = state {
+            if let Some(state) = state.as_ref() {
                 SelectObject(hdc, HGDIOBJ(state.font.0));
             }
             draw_text(
                 hdc,
                 scale(12, dpi),
                 scale(12, dpi),
-                &wide("Enter a key sequence, e.g. Ctrl+Alt+X:"),
+                &wide(state.as_ref().map(|state| state.hint.as_str()).unwrap_or("")),
                 TEXT,
             );
             draw_text(
                 hdc,
                 scale(12, dpi),
                 client.bottom - scale(22, dpi),
-                &wide("Enter = OK, Esc = Cancel"),
+                &trw("Enter = OK, Esc = Cancel"),
                 MUTED,
             );
             let _ = EndPaint(hwnd, &paint);
@@ -6703,7 +6714,12 @@ unsafe extern "system" fn prompt_wndproc(
     }
 }
 
-unsafe fn prompt_text(parent: HWND, title: &str, initial: &str) -> Option<String> {
+unsafe fn prompt_text(
+    parent: HWND,
+    title: &str,
+    hint: &str,
+    initial: &str,
+) -> Option<String> {
     PROMPT_CLASS.get_or_init(|| {
         let Ok(module) = GetModuleHandleW(None) else {
             return;
@@ -6751,6 +6767,7 @@ unsafe fn prompt_text(parent: HWND, title: &str, initial: &str) -> Option<String
     let state = Box::new(PromptState {
         edit: HWND::default(),
         initial: initial.to_string(),
+        hint: hint.to_string(),
         result: result.clone(),
         dpi,
         font,
@@ -6893,9 +6910,9 @@ unsafe fn accept_hotkey_dialog(hwnd: HWND) {
     {
         if let Some(sequence) = state.sequence {
             if reserved_hotkey(&sequence) {
-                let message = wide_z(
+                let message = wide_z(&i18n::tr(
                     "This key combination is reserved by Windows. Please choose another one.",
-                );
+                ));
                 let _ = MessageBoxW(
                     Some(hwnd),
                     PCWSTR(message.as_ptr()),
@@ -7276,10 +7293,9 @@ unsafe fn startup_checks(hwnd: HWND) {
     .map(|value| !value.trim().is_empty())
     .unwrap_or(false);
     if !config_registered {
-        let text = wide_z(
-            "Equalizer APO is not installed correctly: the configuration path is not registered, so gain and filter changes will not affect audio.
-Do you want to start the installer (Setup.exe) to repair the installation?",
-        );
+        let text = wide_z(&i18n::tr(
+            "Equalizer APO is not installed correctly: the configuration path is not registered, so gain and filter changes will not affect audio.\nDo you want to start the installer (Setup.exe) to repair the installation?",
+        ));
         let answer = MessageBoxW(
             Some(hwnd),
             PCWSTR(text.as_ptr()),
