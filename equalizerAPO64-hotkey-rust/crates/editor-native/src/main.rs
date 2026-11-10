@@ -77,7 +77,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     GetWindowRect, GetWindowTextW, IsDialogMessageW, IsIconic, IsWindow, KillTimer, LoadCursorW,
     MessageBoxW, PostMessageW, PostQuitMessage, RegisterClassW, SendMessageW, SetTimer,
     SetWindowLongPtrW, SetWindowPos, SetWindowTextW, SetForegroundWindow, ShowWindow,
-    TrackPopupMenuEx, TranslateMessage, CS_HREDRAW, CS_VREDRAW, CW_USEDEFAULT, ES_AUTOHSCROLL,
+    TrackPopupMenuEx, TranslateMessage, CS_DBLCLKS, CS_HREDRAW, CS_VREDRAW, CW_USEDEFAULT, ES_AUTOHSCROLL,
     GWLP_USERDATA, GWLP_WNDPROC, HMENU, IDCANCEL, IDC_ARROW, IDYES,
     MB_ICONINFORMATION, MB_ICONQUESTION, MB_ICONWARNING, MB_OK, MB_YESNO, MB_YESNOCANCEL,
     MF_BYCOMMAND, MF_CHECKED,
@@ -7230,7 +7230,7 @@ fn main() -> windows::core::Result<()> {
         let cursor = LoadCursorW(None, IDC_ARROW)?;
         let class_name = wide_z("EapoNativeEditorMain");
         let class = WNDCLASSW {
-            style: CS_HREDRAW | CS_VREDRAW,
+            style: CS_HREDRAW | CS_VREDRAW | CS_DBLCLKS,
             lpfnWndProc: Some(main_window_proc),
             hInstance: instance,
             hCursor: cursor,
