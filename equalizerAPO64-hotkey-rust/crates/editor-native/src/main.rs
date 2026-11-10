@@ -3751,8 +3751,15 @@ impl App {
         let mut menu_texts: Vec<Vec<u16>> = Vec::new();
         match kind {
             AnalysisSetting::StartFrom => {
-                let _ = AppendMenuW(menu, MF_STRING, 700, menu_text(&mut menu_texts, "config.txt"));
-                let _ = AppendMenuW(menu, MF_STRING, 701, menu_text(&mut menu_texts, "Current file"));
+                let current = if self.analysis_start_from == 1 { 701 } else { 700 };
+                for (id, label) in [(700, "config.txt"), (701, "Current file")] {
+                    let flags = if id == current {
+                        MF_STRING | MF_CHECKED
+                    } else {
+                        MF_STRING
+                    };
+                    let _ = AppendMenuW(menu, flags, id, menu_text(&mut menu_texts, label));
+                }
             }
             AnalysisSetting::Channel => {
                 for (index, name) in self.channel_names.iter().enumerate() {
@@ -3766,9 +3773,14 @@ impl App {
             }
             AnalysisSetting::Resolution => {
                 for (index, resolution) in ANALYSIS_RESOLUTIONS.iter().enumerate() {
+                    let flags = if *resolution == self.analysis_resolution {
+                        MF_STRING | MF_CHECKED
+                    } else {
+                        MF_STRING
+                    };
                     let _ = AppendMenuW(
                         menu,
-                        MF_STRING,
+                        flags,
                         740 + index,
                         menu_raw(&mut menu_texts, &resolution.to_string()),
                     );
