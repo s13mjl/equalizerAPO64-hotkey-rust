@@ -259,7 +259,95 @@ pub fn save_row_preferences(config_path: &str, items: &[FilterItem]) {
     let _ = eapo_common::registry_helper::write_multi_value(&key, "rowPrefs", &lines);
 }
 
-pub fn load_row_hotkeys(config_path: &str) -> std::collections::HashMap<usize, crate::keyseq::KeySequence> {
+/// Stable fingerprint of a filter row, used to keep hotkeys attached to the
+/// same filter when rows are inserted, removed or reordered.
+///
+/// The enabled flag (`#` prefix) and indentation are ignored so toggling a
+/// filter does not detach its hotkey.  Whitespace runs are collapsed because
+/// the configuration grammar treats them as equivalent.
+fn hotkey_line_hash(line: &str) -> u64 {
+    let mut body = line.trim();
+    if let Some(rest) = body.strip_prefix('#') {
+        body = rest.strip_prefix(' ').unwrap_or(rest);
+    }
+    let normalized: Vec<&str> = body.split_whitespace().collect();
+    let mut hash = 0xcbf2_9ce4_8422_2325u64;
+    for (index, word) in normalized.iter().enumerate() {
+        if index != 0 {
+            hash ^= b' ' as u64;
+            hash = hash.wrapping_mul(0x0000_0100_0000_01B3);
+        }
+        for byte in word.bytes() {
+            hash ^= byte as u64;
+            hash = hash.wrapping_mul(0x0000_0100_0000_01B3);
+        }
+    }
+    hash
+}
+
+/// Binding keys for every row, with an occurrence suffix so duplicate filter
+/// lines remain distinguishable.  Reordering changes the suffix order of
+/// identical rows only, which is the best that can be done without storing an
+/// identity inside the configuration file.
+pub fn hotkey_keys(lines: &[String]) -> Vec<String> {
+    let mut seen: std::collections::HashMap<u64, usize> = std::collections::HashMap::new();
+    lines
+        .iter()
+        .map(|line| {
+            let hash = hotkey_line_hash(line);
+            let occurrence = seen.entry(hash).or_insert(0);
+            let key = format!("{hash:016x}-{occurrence}");
+            *occurrence += 1;
+            key
+        })
+        .collect()
+}
+
+pub fn load_hotkey_bindings(
+    config_path: &str,
+) -> std::collections::HashMap<String, crate::keyseq::KeySequence> {
+    let mut result = std::collections::HashMap::new();
+    if config_path.is_empty() {
+        return result;
+    }
+    let key = file_pref_key(config_path);
+    let Ok(lines) = eapo_common::registry_helper::read_multi_value(&key, "hotkeyBindings") else {
+        return result;
+    };
+    for line in lines {
+        let Some((binding, text)) = line.split_once('|') else {
+            continue;
+        };
+        if let Some(sequence) = crate::keyseq::KeySequence::parse(text) {
+            result.insert(binding.to_string(), sequence);
+        }
+    }
+    result
+}
+
+pub fn save_hotkey_bindings(
+    config_path: &str,
+    bindings: &[(String, crate::keyseq::KeySequence)],
+) {
+    if config_path.is_empty() {
+        return;
+    }
+    let key = file_pref_key(config_path);
+    if bindings.is_empty() {
+        let _ = eapo_common::registry_helper::delete_value(&key, "hotkeyBindings");
+        return;
+    }
+    let lines: Vec<String> = bindings
+        .iter()
+        .map(|(binding, sequence)| format!("{binding}|{}", sequence.to_string_qt()))
+        .collect();
+    let _ = eapo_common::registry_helper::create_key(&key);
+    let _ = eapo_common::registry_helper::write_multi_value(&key, "hotkeyBindings", &lines);
+}
+
+pub fn load_row_hotkeys(
+    config_path: &str,
+) -> std::collections::HashMap<usize, (String, crate::keyseq::KeySequence)> {
     let mut result = std::collections::HashMap::new();
     if config_path.is_empty() {
         return result;
@@ -270,14 +358,14 @@ pub fn load_row_hotkeys(config_path: &str) -> std::collections::HashMap<usize, c
     };
     for line in lines {
         let Some((number, rest)) = line.split_once(':') else { continue };
-        let Some((_command, json)) = rest.split_once(':') else { continue };
+        let Some((command, json)) = rest.split_once(':') else { continue };
         let Ok(index) = number.parse::<usize>() else { continue };
         let Ok(JsonValue::Object(map)) = serde_json::from_str::<JsonValue>(json) else {
             continue;
         };
         if let Some(text) = map.get("hotkey").and_then(|value| value.as_str()) {
             if let Some(sequence) = crate::keyseq::KeySequence::parse(text) {
-                result.insert(index, sequence);
+                result.insert(index, (command.to_string(), sequence));
             }
         }
     }

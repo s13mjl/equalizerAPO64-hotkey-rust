@@ -1965,12 +1965,34 @@ impl App {
         let Some(path) = self.doc_path.clone() else {
             return;
         };
-        let hotkeys = settings::load_row_hotkeys(&path.to_string_lossy());
-        for (index, sequence) in hotkeys {
+        let text_path = path.to_string_lossy();
+        let bindings = settings::load_hotkey_bindings(&text_path);
+        if !bindings.is_empty() {
+            let lines: Vec<String> = self.rows.iter().map(|row| row.line.clone()).collect();
+            let keys = settings::hotkey_keys(&lines);
+            for (row, key) in self.rows.iter_mut().zip(keys) {
+                let Some(sequence) = bindings.get(&key).copied() else {
+                    continue;
+                };
+                row.hotkey = Some(sequence);
+                let filter_id = format!("{:x}", row.uid);
+                let _ = self.hotkeys.register_hotkey(&filter_id, Some(sequence));
+            }
+            return;
+        }
+        // Files written before `hotkeyBindings` existed only have the row
+        // number in `rowPrefs`.  Verify the command prefix so a shifted row
+        // never receives another filter's hotkey.
+        let hotkeys = settings::load_row_hotkeys(&text_path);
+        for (index, (command, sequence)) in hotkeys {
             if index == 0 || index > self.rows.len() {
                 continue;
             }
             let row = &mut self.rows[index - 1];
+            let row_command = row.line.split(':').next().unwrap_or("").trim();
+            if row_command != command {
+                continue;
+            }
             row.hotkey = Some(sequence);
             let filter_id = format!("{:x}", row.uid);
             let _ = self.hotkeys.register_hotkey(&filter_id, Some(sequence));
@@ -1981,6 +2003,16 @@ impl App {
         let Some(path) = self.doc_path.clone() else {
             return;
         };
+        let path = path.to_string_lossy();
+        let lines: Vec<String> = self.rows.iter().map(|row| row.line.clone()).collect();
+        let keys = settings::hotkey_keys(&lines);
+        let bindings: Vec<(String, KeySequence)> = self
+            .rows
+            .iter()
+            .zip(keys)
+            .filter_map(|(row, key)| row.hotkey.map(|sequence| (key, sequence)))
+            .collect();
+        settings::save_hotkey_bindings(&path, &bindings);
         let updates: Vec<(usize, String, Option<KeySequence>)> = self
             .rows
             .iter()
@@ -1996,7 +2028,7 @@ impl App {
                 (index + 1, command, row.hotkey)
             })
             .collect();
-        settings::save_row_hotkeys(&path.to_string_lossy(), &updates);
+        settings::save_row_hotkeys(&path, &updates);
     }
 
     unsafe fn set_hotkey_for_row(&mut self, hwnd: HWND, row: usize) {
@@ -2220,6 +2252,7 @@ impl App {
                 .unwrap_or_default();
             settings::push_recent(&mut self.recent_files, &path_string);
             self.capture_active_tab();
+            self.save_hotkeys();
             self.update_title(hwnd);
             let _ = InvalidateRect(Some(hwnd), None, false);
         }
@@ -2854,6 +2887,7 @@ impl App {
                 self.rows[edit.row].item = None;
                 self.dirty = true;
                 self.update_title(hwnd);
+                self.save_hotkeys();
                 self.autosave(hwnd);
             }
         }
@@ -3103,6 +3137,7 @@ impl App {
                 }
                 if changed {
                     self.sync_item(hwnd, edit.row);
+                    self.save_hotkeys();
                     self.start_analysis();
                     self.autosave(hwnd);
                 }
@@ -3178,6 +3213,7 @@ impl App {
         self.recompute_prefix();
         self.ensure_visible(hwnd, index);
         self.update_title(hwnd);
+        self.save_hotkeys();
         self.autosave(hwnd);
         let _ = InvalidateRect(Some(hwnd), None, false);
     }
@@ -3210,6 +3246,7 @@ impl App {
         self.selection_anchor = self.selected;
         self.dirty = true;
         self.recompute_prefix();
+        self.save_hotkeys();
         self.reload_hotkeys();
         self.update_title(hwnd);
         self.start_analysis();
@@ -3292,6 +3329,7 @@ impl App {
         self.dirty = true;
         self.recompute_prefix();
         self.update_title(hwnd);
+        self.save_hotkeys();
         self.start_analysis();
         self.autosave(hwnd);
         let _ = InvalidateRect(Some(hwnd), None, false);
@@ -3393,6 +3431,7 @@ impl App {
                     }
                     if opened {
                         self.sync_item(hwnd, index);
+                        self.save_hotkeys();
                         self.start_analysis();
                         self.autosave(hwnd);
                         let _ = InvalidateRect(Some(hwnd), None, false);
@@ -4835,6 +4874,7 @@ impl App {
                     }
                     if command == MENU_VST_EMBED || command == MENU_VST_AUTO_APPLY {
                         self.dirty = true;
+                        self.save_hotkeys();
                         self.autosave(hwnd);
                     }
                     let _ = InvalidateRect(Some(hwnd), None, false);
@@ -4874,6 +4914,7 @@ impl App {
         if sync {
             self.sync_item(hwnd, row);
             if drag.is_none() {
+                self.save_hotkeys();
                 self.autosave(hwnd);
             }
         }
@@ -4923,6 +4964,8 @@ impl App {
         }
         if added {
             self.sync_item(hwnd, row);
+            self.save_hotkeys();
+            self.autosave(hwnd);
             self.start_analysis();
             self.ensure_geq_table_visible(hwnd, row);
             let _ = InvalidateRect(Some(hwnd), None, false);
@@ -5016,6 +5059,7 @@ impl App {
         }
         if changed {
             self.sync_item(hwnd, row);
+            self.save_hotkeys();
             self.start_analysis();
             self.autosave(hwnd);
             let _ = InvalidateRect(Some(hwnd), None, false);
@@ -5289,11 +5333,15 @@ impl App {
             } else {
                 drag_value_field(drag.field)
             };
+            let moved = self.drag_moved;
             self.drag_moved = false;
             if self.instant_mode && self.doc_path.is_some() {
                 self.save(hwnd);
             } else {
                 self.start_analysis();
+            }
+            if moved {
+                self.save_hotkeys();
             }
             let _ = InvalidateRect(Some(hwnd), None, false);
             if let Some(field) = open_editor {
@@ -5354,6 +5402,7 @@ impl App {
         self.dirty = true;
         self.recompute_prefix();
         self.update_title(hwnd);
+        self.save_hotkeys();
         self.start_analysis();
         self.autosave(hwnd);
         let _ = InvalidateRect(Some(hwnd), None, false);
