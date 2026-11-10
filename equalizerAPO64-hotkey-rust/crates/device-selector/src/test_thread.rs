@@ -173,6 +173,9 @@ impl DeviceTestThread {
     }
 
     fn run_inner(&mut self) {
+        if self.cancel.load(Ordering::Relaxed) {
+            return;
+        }
         let _ = self
             .sender
             .send(TestEvent::Log("Restarting audio service...".to_string()));
@@ -181,6 +184,9 @@ impl DeviceTestThread {
                 .sender
                 .send(TestEvent::LogError("Restart failed.".to_string()));
             let _ = self.sender.send(TestEvent::Abort(error.to_string(), -1));
+            return;
+        }
+        if self.cancel.load(Ordering::Relaxed) {
             return;
         }
 
@@ -206,6 +212,9 @@ impl DeviceTestThread {
             );
 
             for device_guid in remaining_devices.clone() {
+                if self.cancel.load(Ordering::Relaxed) {
+                    break;
+                }
                 let Some(index) = self.index_of(&device_guid) else {
                     continue;
                 };
@@ -250,7 +259,15 @@ impl DeviceTestThread {
 
             let deadline = Instant::now() + Duration::from_secs(3);
             loop {
-                let message = match receive_thread.wait_until(deadline) {
+                if self.cancel.load(Ordering::Relaxed) {
+                    break;
+                }
+                let now = Instant::now();
+                if now >= deadline {
+                    break;
+                }
+                let slice = (now + Duration::from_millis(150)).min(deadline);
+                let message = match receive_thread.wait_until(slice) {
                     Ok(message) => message,
                     Err(error) => {
                         let _ = self
@@ -265,7 +282,7 @@ impl DeviceTestThread {
                     }
                 };
                 if message.is_empty() {
-                    break;
+                    continue;
                 }
 
                 let value: serde_json::Value = match serde_json::from_str(&message) {
@@ -470,6 +487,14 @@ impl DeviceTestThread {
                         .send(TestEvent::Log("Trying other configurations...".to_string()));
                 }
 
+                if self.cancel.load(Ordering::Relaxed) {
+                    drop(receive_thread);
+                    let _ = registry_helper::delete_value(
+                        eapo_common::APP_REGPATH,
+                        "DeviceTestPipeName",
+                    );
+                    return;
+                }
                 let _ = self
                     .sender
                     .send(TestEvent::Log("Restarting audio service...".to_string()));
