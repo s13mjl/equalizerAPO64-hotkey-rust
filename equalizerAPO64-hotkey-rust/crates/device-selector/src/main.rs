@@ -92,7 +92,17 @@ fn main() {
             }
         }
         // Elevation was declined; without it the device configuration cannot
-        // be changed, so do not start the UI.
+        // be changed, so tell the user instead of disappearing silently.
+        let text = wide_z("Administrator privileges are required to change device settings.");
+        let title = wide_z(&i18n::tr("Error"));
+        unsafe {
+            MessageBoxW(
+                None,
+                PCWSTR(text.as_ptr()),
+                PCWSTR(title.as_ptr()),
+                MB_OK | MB_ICONWARNING,
+            );
+        }
         return;
     }
 
