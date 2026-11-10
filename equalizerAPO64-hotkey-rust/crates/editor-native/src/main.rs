@@ -549,6 +549,8 @@ struct TabInfo {
     lines: Vec<String>,
     offset: i32,
     selected: Option<usize>,
+    selection: HashSet<usize>,
+    selection_anchor: Option<usize>,
     dirty: bool,
 }
 
@@ -1860,6 +1862,8 @@ impl App {
             lines: app.rows.iter().map(|row| row.line.clone()).collect(),
             offset: 0,
             selected: None,
+            selection: HashSet::new(),
+            selection_anchor: None,
             dirty: false,
         });
         if live_mode != LiveMode::Off && !SCROLL_TEST.load(Ordering::Relaxed) {
@@ -2136,6 +2140,8 @@ impl App {
         tab.lines = lines;
         tab.offset = self.offset;
         tab.selected = self.selected;
+        tab.selection = self.selection.clone();
+        tab.selection_anchor = self.selection_anchor;
         tab.dirty = self.dirty;
     }
 
@@ -2147,6 +2153,8 @@ impl App {
         let path = tab.path.clone();
         let offset = tab.offset;
         let selected = tab.selected;
+        let selection = tab.selection.clone();
+        let selection_anchor = tab.selection_anchor;
         let dirty = tab.dirty;
         self.active_tab = index;
         self.doc_path = path;
@@ -2154,8 +2162,12 @@ impl App {
         self.reload_hotkeys();
         self.offset = offset;
         self.selected = selected;
-        self.selection = selected.into_iter().collect();
-        self.selection_anchor = selected;
+        self.selection = if selection.is_empty() {
+            selected.into_iter().collect()
+        } else {
+            selection
+        };
+        self.selection_anchor = selection_anchor.or(selected);
         self.dirty = dirty;
         self.edit = None;
         self.drag = None;
@@ -2188,6 +2200,8 @@ impl App {
             lines: vec![String::new()],
             offset: 0,
             selected: None,
+            selection: HashSet::new(),
+            selection_anchor: None,
             dirty: false,
         });
         self.load_tab(hwnd, index);
@@ -2242,6 +2256,8 @@ impl App {
                 lines,
                 offset: 0,
                 selected: None,
+                selection: HashSet::new(),
+                selection_anchor: None,
                 dirty: false,
             });
             last = Some(self.tabs.len() - 1);
@@ -4250,6 +4266,8 @@ impl App {
                 lines: vec![String::new()],
                 offset: 0,
                 selected: None,
+                selection: HashSet::new(),
+                selection_anchor: None,
                 dirty: false,
             });
         }
