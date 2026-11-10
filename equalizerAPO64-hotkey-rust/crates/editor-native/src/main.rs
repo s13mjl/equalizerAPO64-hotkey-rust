@@ -1762,6 +1762,8 @@ struct App {
     next_uid: u64,
     tabs: Vec<TabInfo>,
     active_tab: usize,
+    /// Last client width, used to keep the tab strip inside the window.
+    client_width: i32,
     hotkeys: HotkeyManager,
     prefs: GlobalPreferences,
     skip_save_preferences: bool,
@@ -1900,6 +1902,7 @@ impl App {
             next_uid: 1,
             tabs: Vec::new(),
             active_tab: 0,
+            client_width: 0,
             hotkeys: HotkeyManager::new(),
             prefs,
             skip_save_preferences: false,
@@ -4027,16 +4030,24 @@ impl App {
             .unwrap_or(false)
     }
 
-    /// Tab rectangles in paint order (client coordinates).
+    /// Tab rectangles in paint order (client coordinates). Widths shrink so
+    /// the close button of the last tab never leaves the window.
     fn tab_layout(&self) -> Vec<(usize, RECT)> {
         let dpi = self.dpi;
         let chrome = self.chrome_height();
         let top = self.tab_top() + scale(2, dpi);
-        let mut tab_x = scale(8, dpi);
+        let margin = scale(8, dpi);
+        let gap = scale(2, dpi);
+        let available = (self.client_width - margin * 2 - scale(8, dpi)).max(scale(90, dpi));
+        let count = self.tabs.len().max(1) as i32;
+        let max_per_tab = ((available - gap * (count - 1)) / count).max(scale(48, dpi));
+        let mut tab_x = margin;
         let mut rects = Vec::with_capacity(self.tabs.len());
         for (index, tab) in self.tabs.iter().enumerate() {
             let text_width = text_width_estimate(&tab.title) + if tab.dirty { 14 } else { 0 };
-            let width = scale(text_width + 34, dpi).clamp(scale(90, dpi), scale(240, dpi));
+            let width = scale(text_width + 34, dpi)
+                .clamp(scale(90, dpi), scale(240, dpi))
+                .min(max_per_tab);
             rects.push((
                 index,
                 RECT {
@@ -4046,7 +4057,7 @@ impl App {
                     bottom: chrome,
                 },
             ));
-            tab_x += width + scale(2, dpi);
+            tab_x += width + gap;
         }
         rects
     }
@@ -5875,6 +5886,7 @@ impl App {
         set_hover_pos(self.hover_pos);
         let mut client = RECT::default();
         let _ = GetClientRect(hwnd, &mut client);
+        self.client_width = client.right;
         SetBkMode(hdc, TRANSPARENT);
         let chrome = self.chrome_height();
 
