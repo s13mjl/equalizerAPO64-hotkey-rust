@@ -1110,22 +1110,38 @@ fn graphic_eq_ui(
                         for i in 0..g.nodes.len() {
                             let selected = g.selected.contains(&i);
                             let mut changed_row = false;
-                            ui.horizontal(|ui| {
-                                if ui.selectable_label(selected, format!("{}", crate::model::qt_num(g.nodes[i].freq))).clicked() {
-                                    g.selected = vec![i];
-                                }
-                            });
                             if g.band_count == -1 {
                                 let mut freq = g.nodes[i].freq;
-                                if ui.add(egui::DragValue::new(&mut freq).speed(0.5).range(0.001..=30000.0)).changed() {
+                                let response = ui.add(
+                                    egui::DragValue::new(&mut freq)
+                                        .speed(0.5)
+                                        .range(0.001..=30000.0),
+                                );
+                                if response.clicked() {
+                                    g.selected = vec![i];
+                                }
+                                if response.changed() {
                                     g.nodes[i].freq = freq;
                                     changed_row = true;
                                 }
-                            } else {
-                                ui.label(crate::model::qt_num(g.nodes[i].freq));
+                            } else if ui
+                                .selectable_label(
+                                    selected,
+                                    format!("{}", crate::model::qt_num(g.nodes[i].freq)),
+                                )
+                                .clicked()
+                            {
+                                g.selected = vec![i];
                             }
                             let mut db = g.nodes[i].db_gain;
-                            if ui.add(egui::DragValue::new(&mut db).speed(0.1).range(-100.0..=100.0)).changed() {
+                            if ui
+                                .add(
+                                    egui::DragValue::new(&mut db)
+                                        .speed(0.1)
+                                        .range(-100.0..=100.0),
+                                )
+                                .changed()
+                            {
                                 g.nodes[i].db_gain = db;
                                 changed_row = true;
                             }
