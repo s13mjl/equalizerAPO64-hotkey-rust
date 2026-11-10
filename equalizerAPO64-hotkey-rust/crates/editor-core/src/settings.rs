@@ -414,6 +414,10 @@ pub fn save_row_hotkeys(
             }
         }
     }
+    // Drop rows that no longer exist so their old hotkeys cannot reappear
+    // when new rows are appended to the same file.
+    let max_index = updates.iter().map(|(index, _, _)| *index).max().unwrap_or(0);
+    entries.retain(|index, _| *index > 0 && *index <= max_index);
     let mut lines = Vec::new();
     for (index, (command, map)) in entries {
         if map.is_empty() {
