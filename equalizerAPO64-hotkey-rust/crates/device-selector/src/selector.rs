@@ -3,6 +3,7 @@
 
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicI32, Ordering};
+use std::sync::mpsc::{self, Receiver, TryRecvError};
 use std::sync::Arc;
 
 use eapo_apo_info::{
@@ -28,6 +29,11 @@ struct DeviceEntry {
     info: Arc<dyn AbstractAPOInfo>,
     checked: bool,
     group: usize,
+}
+
+struct ApplyResult {
+    device_updated: bool,
+    errors: Vec<String>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -67,6 +73,7 @@ pub struct SelectorApp {
     test_ran: bool,
     test_result: i32,
     pending_apply_complete: Option<bool>,
+    apply_rx: Option<Receiver<ApplyResult>>,
     closing: bool,
     exit_result: Arc<AtomicI32>,
 }
@@ -137,6 +144,7 @@ impl SelectorApp {
             test_ran: false,
             test_result: 0,
             pending_apply_complete: None,
+            apply_rx: None,
             closing: false,
             exit_result,
         };
@@ -164,9 +172,30 @@ impl SelectorApp {
             return;
         }
 
+        let apply_finished = match &self.apply_rx {
+            Some(receiver) => match receiver.try_recv() {
+                Ok(result) => Some(result),
+                Err(TryRecvError::Empty) => None,
+                Err(TryRecvError::Disconnected) => Some(ApplyResult {
+                    device_updated: false,
+                    errors: vec![crate::i18n::tr(
+                        "The configuration could not be applied.",
+                    )],
+                }),
+            },
+            None => None,
+        };
+        if let Some(result) = apply_finished {
+            self.apply_rx = None;
+            self.finish_apply(result);
+        }
+
         let close_requested = ctx.input(|input| input.viewport().close_requested());
         if close_requested {
-            if self.active_message.is_some() || self.test_dialog.is_some() {
+            if self.active_message.is_some()
+                || self.test_dialog.is_some()
+                || self.apply_rx.is_some()
+            {
                 ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
             } else {
                 ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
@@ -342,7 +371,7 @@ impl SelectorApp {
         if cancel_clicked {
             self.on_reject();
         } else if ok_clicked {
-            self.apply();
+            self.start_apply();
         }
         if self.active_message.is_none() {
             self.active_message = self.messages.pop_front();
@@ -378,6 +407,16 @@ impl SelectorApp {
                 self.active_message = None;
                 self.handle_message_action(&message.action, answer);
             }
+        }
+
+        if self.apply_rx.is_some() {
+            egui::Modal::new(egui::Id::new("device_selector_apply")).show(ctx, |ui| {
+                ui.set_min_width(320.0);
+                ui.horizontal(|ui| {
+                    ui.spinner();
+                    ui.label(crate::i18n::tr("Applying changes..."));
+                });
+            });
         }
 
         if let Some(dialog) = &mut self.test_dialog {
@@ -610,44 +649,57 @@ CAUTION: Some sound card drivers can produce unwanted sounds when this is enable
         }
     }
 
-    fn apply(&mut self) {
-        let mut device_updated = false;
-        let mut errors: Vec<String> = Vec::new();
-
-        for entry in &self.devices {
-            let info = &entry.info;
-            let checked = entry.checked;
-            let result: Result<bool, RegistryException> =
-                if checked && !info.is_installed() {
-                    info.install().map(|_| true)
-                } else if !checked && info.is_installed() {
-                    info.uninstall().map(|_| true)
-                } else if checked
-                    && (info.can_be_upgraded()
-                        || info.has_changes()
-                        || info.is_enhancements_disabled())
-                {
-                    info.reinstall().map(|_| true)
-                } else {
-                    Ok(false)
-                };
-
-            match result {
-                Ok(performed) => {
-                    if performed && info.as_any().downcast_ref::<DeviceAPOInfo>().is_some() {
-                        device_updated = true;
-                    }
-                }
-                Err(error) => errors.push(error.to_string()),
-            }
+    fn start_apply(&mut self) {
+        if self.apply_rx.is_some() {
+            return;
         }
+        let devices: Vec<(Arc<dyn AbstractAPOInfo>, bool)> = self
+            .devices
+            .iter()
+            .map(|entry| (entry.info.clone(), entry.checked))
+            .collect();
+        let (sender, receiver) = mpsc::channel();
+        std::thread::spawn(move || {
+            let mut device_updated = false;
+            let mut errors: Vec<String> = Vec::new();
+            for (info, checked) in devices {
+                let result: Result<bool, RegistryException> =
+                    if checked && !info.is_installed() {
+                        info.install().map(|_| true)
+                    } else if !checked && info.is_installed() {
+                        info.uninstall().map(|_| true)
+                    } else if checked
+                        && (info.can_be_upgraded()
+                            || info.has_changes()
+                            || info.is_enhancements_disabled())
+                    {
+                        info.reinstall().map(|_| true)
+                    } else {
+                        Ok(false)
+                    };
+                match result {
+                    Ok(performed) => {
+                        if performed && info.as_any().downcast_ref::<DeviceAPOInfo>().is_some() {
+                            device_updated = true;
+                        }
+                    }
+                    Err(error) => errors.push(error.to_string()),
+                }
+            }
+            let _ = VoicemeeterAPOInfo::ensure_voicemeeter_client_running();
+            let _ = sender.send(ApplyResult {
+                device_updated,
+                errors,
+            });
+        });
+        self.apply_rx = Some(receiver);
+    }
 
-        let _ = VoicemeeterAPOInfo::ensure_voicemeeter_client_running();
-
-        if errors.is_empty() {
-            self.complete(device_updated);
+    fn finish_apply(&mut self, result: ApplyResult) {
+        if result.errors.is_empty() {
+            self.complete(result.device_updated);
         } else {
-            for error in errors {
+            for error in result.errors {
                 self.messages.push_back(DialogMessage {
                     title: crate::i18n::tr("Error while accessing the registry"),
                     text: error,
@@ -655,7 +707,7 @@ CAUTION: Some sound card drivers can produce unwanted sounds when this is enable
                     action: MessageAction::None,
                 });
             }
-            self.pending_apply_complete = Some(device_updated);
+            self.pending_apply_complete = Some(result.device_updated);
         }
     }
 
