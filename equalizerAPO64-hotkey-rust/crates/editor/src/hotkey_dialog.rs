@@ -53,53 +53,45 @@ impl HotkeyDialog {
             }
         }
 
-        let mut open = self.open;
         let mut result = None;
-        egui::Window::new("Set Hotkey")
-            .collapsible(false)
-            .resizable(false)
-            .default_width(400.0)
-            .open(&mut open)
-            .show(ctx, |ui| {
-                ui.vertical_centered(|ui| {
-                    ui.label("Press the key combination you want to use as a hotkey:");
-                    ui.add_space(12.0);
-                    let (text, color) = match self.sequence {
-                        Some(seq) => (seq.to_string_qt(), egui::Color32::from_rgb(0, 120, 0)),
-                        None => ("Press a key combination...".to_string(), egui::Color32::GRAY),
-                    };
-                    let label = RichText::new(text).size(16.0).color(color);
-                    egui::Frame::group(ui.style()).show(ui, |ui| {
-                        ui.set_min_width(320.0);
-                        ui.vertical_centered(|ui| {
-                            ui.add_space(10.0);
-                            ui.label(label);
-                            ui.add_space(10.0);
-                        });
+        egui::Modal::new(egui::Id::new("hotkey_dialog")).show(ctx, |ui| {
+            ui.set_min_width(400.0);
+            ui.heading("Set Hotkey");
+            ui.vertical_centered(|ui| {
+                ui.label("Press the key combination you want to use as a hotkey:");
+                ui.add_space(12.0);
+                let (text, color) = match self.sequence {
+                    Some(seq) => (seq.to_string_qt(), egui::Color32::from_rgb(0, 120, 0)),
+                    None => ("Press a key combination...".to_string(), egui::Color32::GRAY),
+                };
+                let label = RichText::new(text).size(16.0).color(color);
+                egui::Frame::group(ui.style()).show(ui, |ui| {
+                    ui.set_min_width(320.0);
+                    ui.vertical_centered(|ui| {
+                        ui.add_space(10.0);
+                        ui.label(label);
+                        ui.add_space(10.0);
                     });
-                    ui.add_space(12.0);
-                    ui.horizontal(|ui| {
-                        if ui.button("Clear").clicked() {
-                            self.sequence = None;
+                });
+                ui.add_space(12.0);
+                ui.horizontal(|ui| {
+                    if ui.button("Clear").clicked() {
+                        self.sequence = None;
+                    }
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if ui.button("Cancel").clicked() {
+                            self.open = false;
+                            self.cancelled = true;
                         }
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            if ui.button("Cancel").clicked() {
-                                self.open = false;
-                                self.cancelled = true;
-                            }
-                            if ui.button("OK").clicked() {
-                                self.open = false;
-                                self.accepted = true;
-                                result = Some(self.sequence);
-                            }
-                        });
+                        if ui.button("OK").clicked() {
+                            self.open = false;
+                            self.accepted = true;
+                            result = Some(self.sequence);
+                        }
                     });
                 });
             });
-        if !open && self.open {
-            self.open = false;
-            self.cancelled = true;
-        }
+        });
         if self.cancelled {
             return None;
         }
