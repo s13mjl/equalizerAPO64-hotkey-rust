@@ -74,8 +74,8 @@ use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CallWindowProcW, CheckMenuItem, CreateMenu, CreatePopupMenu, CreateWindowExW,
     CREATESTRUCTW, DefWindowProcW, DeleteMenu, DestroyMenu, DestroyWindow, DispatchMessageW, DrawMenuBar,
     GetClientRect,
-    GetMenu, GetMessageW, GetParent, GetSubMenu, GetWindowLongPtrW, GetWindowPlacement,
-    GetWindowRect, GetWindowTextLengthW, GetWindowTextW, IsDialogMessageW, IsIconic, IsWindow, KillTimer, LoadCursorW,
+    GetMenu, GetMessageW, GetParent, GetSubMenu, GetWindowLongPtrW,
+    GetWindowRect, GetWindowTextLengthW, GetWindowTextW, IsDialogMessageW, IsIconic, IsWindow, IsZoomed, KillTimer, LoadCursorW,
     MessageBoxW, PostMessageW, PostQuitMessage, RegisterClassW, SendMessageW, SetTimer,
     SetWindowLongPtrW, SetWindowPos, SetWindowTextW, SetForegroundWindow, ShowWindow,
     TrackPopupMenuEx, TranslateMessage, CS_DBLCLKS, CS_HREDRAW, CS_VREDRAW, CW_USEDEFAULT, ES_AUTOHSCROLL,
@@ -90,7 +90,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     WM_ERASEBKGND, WM_KEYDOWN, WM_KILLFOCUS, WM_LBUTTONDBLCLK, WM_LBUTTONDOWN, WM_LBUTTONUP,
     WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_NCDESTROY, WM_PAINT, WM_PRINTCLIENT, WM_RBUTTONDOWN, WM_SETFONT,
     WM_SIZE, WM_SYSCHAR, WM_SYSKEYDOWN, WM_SYSCOMMAND,
-    WM_TIMER, WM_VSCROLL, WM_RBUTTONUP, WNDCLASSW, WNDPROC, WINDOWPLACEMENT, WINDOW_EX_STYLE,
+    WM_TIMER, WM_VSCROLL, WM_RBUTTONUP, WNDCLASSW, WNDPROC, WINDOW_EX_STYLE,
     WINDOW_STYLE, WS_BORDER, WS_CLIPCHILDREN, WS_TABSTOP,
     WS_CAPTION, WS_CHILD, WS_OVERLAPPEDWINDOW, WS_POPUP, WS_SYSMENU, WS_VISIBLE, WS_VSCROLL,
     SB_ENDSCROLL,
@@ -2851,20 +2851,18 @@ impl App {
         } else {
             self.channel_mask as i32
         };
-        // Use the restored geometry: when the window is minimized,
-        // GetWindowRect reports the off-screen icon position (-32000) and a
-        // tiny size, which must never be persisted.
-        let mut placement = WINDOWPLACEMENT {
-            length: size_of::<WINDOWPLACEMENT>() as u32,
-            ..Default::default()
-        };
-        if GetWindowPlacement(hwnd, &mut placement).is_ok() {
-            let rect = placement.rcNormalPosition;
-            let width = rect.right - rect.left;
-            let height = rect.bottom - rect.top;
-            if width >= 320 && height >= 240 && rect.left > -30000 && rect.top > -30000 {
-                prefs.window_size = Some((width as f32, height as f32));
-                prefs.window_pos = Some((rect.left as f32, rect.top as f32));
+        // Use the real screen rectangle so the saved position matches the
+        // coordinates CreateWindowExW expects.  Minimized and maximized
+        // windows have no meaningful normal rectangle; keep the last values.
+        if !IsIconic(hwnd).as_bool() && !IsZoomed(hwnd).as_bool() {
+            let mut rect = RECT::default();
+            if GetWindowRect(hwnd, &mut rect).is_ok() {
+                let width = rect.right - rect.left;
+                let height = rect.bottom - rect.top;
+                if width >= 320 && height >= 240 && rect.left > -30000 && rect.top > -30000 {
+                    prefs.window_size = Some((width as f32, height as f32));
+                    prefs.window_pos = Some((rect.left as f32, rect.top as f32));
+                }
             }
         }
         prefs.save();
