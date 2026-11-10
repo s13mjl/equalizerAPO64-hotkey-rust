@@ -82,7 +82,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     GWLP_USERDATA, GWLP_WNDPROC, HMENU, IDCANCEL, IDC_ARROW, IDYES,
     MB_ICONINFORMATION, MB_ICONQUESTION, MB_ICONWARNING, MB_OK, MB_YESNO, MB_YESNOCANCEL,
     MF_BYCOMMAND, MF_BYPOSITION, MF_CHECKED,
-    MF_POPUP, MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MSG, SB_BOTTOM, SB_LINEDOWN,
+    MF_POPUP, MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MF_GRAYED, MSG, SB_BOTTOM, SB_LINEDOWN,
     SB_LINEUP, SB_PAGEDOWN, SB_PAGEUP, SB_THUMBPOSITION, SB_THUMBTRACK, SB_TOP, SB_VERT,
     SCROLLINFO, SC_KEYMENU, SIF_PAGE, SIF_POS, SIF_RANGE, SWP_NOACTIVATE, SWP_NOZORDER, SW_RESTORE,
     SW_SHOW, SW_SHOWNORMAL,
@@ -3497,11 +3497,27 @@ impl App {
             Err(_) => return,
         };
         let mut menu_texts: Vec<Vec<u16>> = Vec::new();
+        let selected_row = self.selected.and_then(|index| self.rows.get(index));
+        let kind = selected_row.map(|row| row.kind);
+        let has_editor = kind.is_some_and(|kind| kind != FilterKind::Unknown);
+        let has_hotkey = selected_row.and_then(|row| row.hotkey).is_some();
+        let flag = |enabled: bool| {
+            if enabled {
+                MF_STRING
+            } else {
+                MF_STRING | MF_GRAYED
+            }
+        };
         let _ = AppendMenuW(menu, MF_STRING, MENU_TOGGLE, menu_text(&mut menu_texts, "Enable / disable"));
-        let _ = AppendMenuW(menu, MF_STRING, MENU_SET_HOTKEY, menu_text(&mut menu_texts, "Set hotkey..."));
-        let _ = AppendMenuW(menu, MF_STRING, MENU_CLEAR_HOTKEY, menu_text(&mut menu_texts, "Clear hotkey"));
+        let _ = AppendMenuW(menu, flag(has_editor), MENU_SET_HOTKEY, menu_text(&mut menu_texts, "Set hotkey..."));
+        let _ = AppendMenuW(menu, flag(has_hotkey), MENU_CLEAR_HOTKEY, menu_text(&mut menu_texts, "Clear hotkey"));
         let _ = AppendMenuW(menu, MF_STRING, MENU_EDIT, menu_text(&mut menu_texts, "Edit text"));
-        let _ = AppendMenuW(menu, MF_STRING, MENU_OPEN_VST, menu_text(&mut menu_texts, "Open VST panel"));
+        let _ = AppendMenuW(
+            menu,
+            flag(kind == Some(FilterKind::Vst)),
+            MENU_OPEN_VST,
+            menu_text(&mut menu_texts, "Open VST panel"),
+        );
         let _ = AppendMenuW(menu, MF_STRING, MENU_REMOVE, menu_text(&mut menu_texts, "Remove"));
         let _ = AppendMenuW(menu, MF_SEPARATOR, 0, w!(""));
         let add_menu = match CreatePopupMenu() {
