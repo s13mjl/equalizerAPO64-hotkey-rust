@@ -1540,9 +1540,9 @@ fn vst_status(vst: &eapo_editor_core::model::VstEditor, readable: Option<bool>) 
     }
     let unreadable = readable == Some(false);
     let text = if vst.status.is_empty() {
-        "VST plugin editor".to_string()
+        i18n::tr("VST plugin")
     } else {
-        vst.status.clone()
+        i18n::tr(&vst.status)
     };
     (text, unreadable)
 }
