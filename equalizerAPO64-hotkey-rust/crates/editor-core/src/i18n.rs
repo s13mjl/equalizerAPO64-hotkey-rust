@@ -362,6 +362,13 @@ static GERMAN: &[(&str, &str)] = &[
     ("Select impulse response", "Impulsantwort auswählen"),
     ("Could not open plugin editor window.", "Plugin-Editor-Fenster konnte nicht geöffnet werden."),
     ("Library has the wrong architecture. Only 64-bit libraries are supported.", "Bibliothek hat die falsche Architektur. Nur 64-Bit-Bibliotheken werden unterstützt."),
+    ("Include...", "Einbinden..."),
+    ("Device...", "Gerät..."),
+    ("Channel...", "Kanal..."),
+    ("Stage...", "Stufe..."),
+    ("VST plugin...", "VST-Plugin..."),
+    ("Convolution...", "Faltung..."),
+    ("Other", "Sonstiges"),
     ("Equalizer APO is not installed correctly: the configuration path is not registered, so gain and filter changes will not affect audio.\nDo you want to start the installer (Setup.exe) to repair the installation?", "Equalizer APO ist nicht korrekt installiert: Der Konfigurationspfad ist nicht registriert, daher wirken sich Gain- und Filteränderungen nicht auf den Ton aus.\nMöchten Sie das Installationsprogramm (Setup.exe) starten, um die Installation zu reparieren?"),
 ];
 
@@ -649,6 +656,13 @@ static FRENCH: &[(&str, &str)] = &[
     ("Select impulse response", "Sélectionner une réponse impulsionnelle"),
     ("Could not open plugin editor window.", "Impossible d'ouvrir la fenêtre de l'éditeur du plugin."),
     ("Library has the wrong architecture. Only 64-bit libraries are supported.", "La bibliothèque a une mauvaise architecture. Seules les bibliothèques 64 bits sont prises en charge."),
+    ("Include...", "Inclure..."),
+    ("Device...", "Appareil..."),
+    ("Channel...", "Canal..."),
+    ("Stage...", "Étage..."),
+    ("VST plugin...", "Plugin VST..."),
+    ("Convolution...", "Convolution..."),
+    ("Other", "Autre"),
     ("Equalizer APO is not installed correctly: the configuration path is not registered, so gain and filter changes will not affect audio.\nDo you want to start the installer (Setup.exe) to repair the installation?", "Equalizer APO n'est pas installé correctement : le chemin de configuration n'est pas enregistré, les modifications de gain et de filtre n'affecteront donc pas l'audio.\nVoulez-vous lancer le programme d'installation (Setup.exe) pour réparer l'installation ?"),
 ];
 
@@ -974,6 +988,13 @@ static CHINESE: &[(&str, &str)] = &[
     ("Select impulse response", "选择脉冲响应"),
     ("Could not open plugin editor window.", "无法打开插件编辑器窗口。"),
     ("Library has the wrong architecture. Only 64-bit libraries are supported.", "库的体系结构错误。仅支持 64 位库。"),
+    ("Include...", "包含..."),
+    ("Device...", "设备..."),
+    ("Channel...", "声道..."),
+    ("Stage...", "阶段..."),
+    ("VST plugin...", "VST 插件..."),
+    ("Convolution...", "卷积..."),
+    ("Other", "其他"),
     ("Equalizer APO is not installed correctly: the configuration path is not registered, so gain and filter changes will not affect audio.\nDo you want to start the installer (Setup.exe) to repair the installation?", "Equalizer APO 未正确安装：未注册配置路径，因此增益和滤镜更改不会影响音频。\n是否启动安装程序（Setup.exe）修复安装？"),
 ];
 
