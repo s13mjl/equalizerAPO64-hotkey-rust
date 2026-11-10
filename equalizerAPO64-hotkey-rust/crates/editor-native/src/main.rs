@@ -2179,7 +2179,7 @@ impl App {
             .as_ref()
             .and_then(|path| path.file_name())
             .map(|name| name.to_string_lossy().into_owned())
-            .unwrap_or_else(|| "Unsaved".to_string())
+            .unwrap_or_else(|| i18n::tr("Unsaved"))
     }
 
     fn capture_active_tab(&mut self) {
@@ -2250,7 +2250,7 @@ impl App {
         self.capture_active_tab();
         let index = self.tabs.len();
         self.tabs.push(TabInfo {
-            title: "Unsaved".to_string(),
+            title: i18n::tr("Unsaved"),
             path: None,
             lines: vec![String::new()],
             offset: 0,
@@ -2698,7 +2698,7 @@ impl App {
             .as_ref()
             .and_then(|path| path.file_name())
             .map(|name| name.to_string_lossy().into_owned())
-            .unwrap_or_else(|| "Unsaved".to_string());
+            .unwrap_or_else(|| i18n::tr("Unsaved"));
         let suffix = if self.dirty { " *" } else { "" };
         // Mark the document the audio engine currently follows for this device.
         let live = self.live_mode != LiveMode::Off
@@ -4387,7 +4387,7 @@ impl App {
         self.tabs.remove(index);
         if self.tabs.is_empty() {
             self.tabs.push(TabInfo {
-                title: "Unsaved".to_string(),
+                title: i18n::tr("Unsaved"),
                 path: None,
                 lines: vec![String::new()],
                 offset: 0,
@@ -5057,6 +5057,7 @@ impl App {
                         Ok(menu) => menu,
                         Err(_) => return,
                     };
+                    let mut menu_texts: Vec<Vec<u16>> = Vec::new();
                     let _ = AppendMenuW(
                         menu,
                         if vst.embed {
@@ -5065,7 +5066,7 @@ impl App {
                             MF_STRING
                         },
                         MENU_VST_EMBED,
-                        w!("Embed"),
+                        menu_text(&mut menu_texts, "Embed"),
                     );
                     let _ = AppendMenuW(
                         menu,
@@ -5075,7 +5076,7 @@ impl App {
                             MF_STRING
                         },
                         MENU_VST_AUTO_APPLY,
-                        w!("Auto apply"),
+                        menu_text(&mut menu_texts, "Auto apply"),
                     );
                     let mut point = POINT { x: menu_x, y: menu_y };
                     let _ = ClientToScreen(hwnd, &mut point);
