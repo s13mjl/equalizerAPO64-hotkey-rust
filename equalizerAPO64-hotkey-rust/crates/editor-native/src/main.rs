@@ -1785,6 +1785,8 @@ struct App {
     volume_analysis_due: Option<std::time::Instant>,
     plot: PlotState,
     plot_fitted_for: (i32, i32),
+    /// Saved analysis view from the preferences, applied after the first fit.
+    plot_restore: Option<(f64, f64, i32, i32)>,
     plot_rect: RECT,
     plot_hover: Option<(i32, i32)>,
     plot_pan: Option<(i32, i32)>,
@@ -1853,6 +1855,18 @@ impl App {
                 None => (Vec::new(), None),
             }
         };
+        let plot_restore = if prefs.analysis_scroll_x != i32::MIN
+            || prefs.analysis_scroll_y != i32::MIN
+        {
+            Some((
+                prefs.analysis_zoom_x,
+                prefs.analysis_zoom_y,
+                prefs.analysis_scroll_x.max(0),
+                prefs.analysis_scroll_y.max(0),
+            ))
+        } else {
+            None
+        };
         let mut app = Self {
             dpi: dpi.max(96),
             body: HFONT::default(),
@@ -1907,6 +1921,7 @@ impl App {
             volume_analysis_due: None,
             plot: PlotState::default(),
             plot_fitted_for: (0, 0),
+            plot_restore,
             plot_rect: RECT::default(),
             plot_hover: None,
             plot_pan: None,
@@ -2980,6 +2995,10 @@ impl App {
         prefs.recent_files = self.recent_files.clone();
         prefs.analysis_resolution = self.analysis_resolution;
         prefs.analysis_start_from = self.analysis_start_from;
+        prefs.analysis_zoom_x = self.plot.zoom_x;
+        prefs.analysis_zoom_y = self.plot.zoom_y;
+        prefs.analysis_scroll_x = self.plot.scroll_x.round() as i32;
+        prefs.analysis_scroll_y = self.plot.scroll_y.round() as i32;
         prefs.analysis_channel = self
             .channel_names
             .get(self.analysis_channel_index)
@@ -6195,7 +6214,14 @@ impl App {
             // squeezing it (wider window => wider, filled plot).
             self.plot.fit(plot_width, plot_height);
             self.plot.fit_frequency_range(20.0, 20000.0, plot_width);
-            self.plot.default_scroll();
+            if let Some((zoom_x, zoom_y, scroll_x, scroll_y)) = self.plot_restore.take() {
+                self.plot.zoom_x = zoom_x.clamp(0.5, 30.0);
+                self.plot.zoom_y = zoom_y.clamp(0.5, 30.0);
+                self.plot.scroll_x = scroll_x as f32;
+                self.plot.scroll_y = scroll_y as f32;
+            } else {
+                self.plot.default_scroll();
+            }
             self.plot.pan(0.0, 0.0, plot_width, plot_height);
             self.plot_fitted_for = (plot_width as i32, plot_height as i32);
         }
