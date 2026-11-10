@@ -11,7 +11,7 @@ mod chooser;
 mod copy_dialog;
 
 use std::cell::{Cell, RefCell};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::mem::size_of;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -1533,19 +1533,11 @@ unsafe fn paint_path_row(
 
 /// Returns the status line for a VST row plus a warning flag for unreadable
 /// plugin files (the audio service runs as LOCAL SERVICE).
-fn vst_status(vst: &eapo_editor_core::model::VstEditor) -> (String, bool) {
+fn vst_status(vst: &eapo_editor_core::model::VstEditor, readable: Option<bool>) -> (String, bool) {
     if vst.path.is_empty() {
         return (i18n::tr("No file selected."), true);
     }
-    let path = std::path::Path::new(&vst.path);
-    let absolute = if path.is_absolute() {
-        path.to_path_buf()
-    } else {
-        std::path::Path::new(&eapo_filters::vst_plugin_library::VSTPluginLibrary::get_default_plugin_path())
-            .join(path)
-    };
-    let unreadable =
-        absolute.exists() && vst_editor::audio_service_readable(&absolute) == Some(false);
+    let unreadable = readable == Some(false);
     let text = if vst.status.is_empty() {
         "VST plugin editor".to_string()
     } else {
@@ -1554,7 +1546,14 @@ fn vst_status(vst: &eapo_editor_core::model::VstEditor) -> (String, bool) {
     (text, unreadable)
 }
 
-unsafe fn paint_vst_row(hdc: HDC, dpi: u32, y: i32, vst: &eapo_editor_core::model::VstEditor, enabled: bool) {
+unsafe fn paint_vst_row(
+    hdc: HDC,
+    dpi: u32,
+    y: i32,
+    vst: &eapo_editor_core::model::VstEditor,
+    readable: Option<bool>,
+    enabled: bool,
+) {
     let rects = path_row_rects(dpi, y);
     let shown = if vst.path.is_empty() { "(none)" } else { &vst.path };
     let title = fit_text(&i18n::tr("VST plugin"), 76);
@@ -1562,7 +1561,7 @@ unsafe fn paint_vst_row(hdc: HDC, dpi: u32, y: i32, vst: &eapo_editor_core::mode
     draw_control(hdc, dpi, &rects[0], &shorten(shown, 60), enabled, None);
     draw_control(hdc, dpi, &rects[1], &i18n::tr("Select file"), enabled, None);
     let actions = vst_action_rects(dpi, y);
-    let (status, warning) = vst_status(vst);
+    let (status, warning) = vst_status(vst, readable);
     draw_text(
         hdc,
         scale(42, dpi),
@@ -1788,6 +1787,9 @@ struct App {
     /// Last manifest content published, with the device it belongs to, so an
     /// unchanged list never rewrites the file (each write reloads the engine).
     live_published: Option<(String, Vec<PathBuf>)>,
+    /// File accessibility for VST rows, queried once per path rather than on
+    /// every repaint.
+    vst_readable_cache: HashMap<String, Option<bool>>,
     live_warning_shown: bool,
 }
 
@@ -1902,6 +1904,7 @@ impl App {
             paint_offset: (0, 0),
             live_mode,
             live_published: None,
+            vst_readable_cache: HashMap::new(),
             live_warning_shown: false,
         };
         app.create_fonts();
@@ -2649,6 +2652,33 @@ impl App {
             }
         }
         self.rows[index].item = Some(Box::new(item));
+    }
+
+    /// Cached accessibility check for a VST plugin path.  The ACL query is
+    /// expensive and used to run on every repaint of the row.
+    fn vst_readable(&mut self, path: &str) -> Option<bool> {
+        if path.is_empty() {
+            return None;
+        }
+        if let Some(value) = self.vst_readable_cache.get(path) {
+            return *value;
+        }
+        let path_ref = std::path::Path::new(path);
+        let absolute = if path_ref.is_absolute() {
+            path_ref.to_path_buf()
+        } else {
+            std::path::Path::new(
+                &eapo_filters::vst_plugin_library::VSTPluginLibrary::get_default_plugin_path(),
+            )
+            .join(path_ref)
+        };
+        let value = if absolute.exists() {
+            vst_editor::audio_service_readable(&absolute)
+        } else {
+            None
+        };
+        self.vst_readable_cache.insert(path.to_string(), value);
+        value
     }
 
     fn sync_item(&mut self, hwnd: HWND, index: usize) {
@@ -4563,6 +4593,7 @@ impl App {
         let mut edit_value: Option<ValueField> = None;
         let mut pan_geq = false;
         let mut scroll_drag: Option<usize> = None;
+        let mut vst_path_changed = false;
         let mut biquad_menu: Option<(BiquadMenu, RECT)> = None;
         if let Some(item) = self.rows[row].item.as_mut() {
             match &mut item.editor {
@@ -4690,6 +4721,7 @@ impl App {
                         if let Some(text) = prompt_text(hwnd, "VST plugin path", &current) {
                             vst.path = text.trim().to_string();
                             vst_editor::refresh_plugin_status(vst);
+                            vst_path_changed = true;
                             sync = true;
                             analyze = true;
                         }
@@ -4702,6 +4734,7 @@ impl App {
                             vst.path =
                                 eapo_editor_core::model::vst_config_path(&chosen.to_string_lossy());
                             vst_editor::refresh_plugin_status(vst);
+                            vst_path_changed = true;
                             sync = true;
                             analyze = true;
                         }
@@ -5034,6 +5067,9 @@ impl App {
                 }
                 _ => {}
             }
+        }
+        if vst_path_changed {
+            self.vst_readable_cache.clear();
         }
         if let Some(top) = scroll_drag {
             self.rows[row].geq_table_top = top;
@@ -6213,6 +6249,17 @@ impl App {
         while index < self.rows.len() && y < client.bottom && guard < while_guard {
             guard += 1;
             self.ensure_item(index);
+            let vst_path = match self.rows[index]
+                .item
+                .as_ref()
+                .and_then(|item| item.editor.as_ref())
+            {
+                Some(FilterEditor::Vst(vst)) => Some(vst.path.clone()),
+                _ => None,
+            };
+            let vst_readable = vst_path
+                .as_deref()
+                .and_then(|path| self.vst_readable(path));
             let row = &self.rows[index];
             let height = row.height as i32;
             let expanded = false;
@@ -6318,7 +6365,7 @@ impl App {
                                 painted = true;
                             }
                             FilterEditor::Vst(vst) => {
-                                paint_vst_row(hdc, self.dpi, y, vst, row.enabled);
+                                paint_vst_row(hdc, self.dpi, y, vst, vst_readable, row.enabled);
                                 painted = true;
                             }
                             FilterEditor::Loudness {
