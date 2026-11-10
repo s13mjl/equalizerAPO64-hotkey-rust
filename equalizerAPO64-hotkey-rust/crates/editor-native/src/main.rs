@@ -72,7 +72,8 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CallWindowProcW, CheckMenuItem, CreateMenu, CreatePopupMenu, CreateWindowExW,
-    CREATESTRUCTW, DefWindowProcW, DestroyMenu, DestroyWindow, DispatchMessageW, GetClientRect,
+    CREATESTRUCTW, DefWindowProcW, DeleteMenu, DestroyMenu, DestroyWindow, DispatchMessageW, DrawMenuBar,
+    GetClientRect,
     GetMenu, GetMessageW, GetParent, GetSubMenu, GetWindowLongPtrW, GetWindowPlacement,
     GetWindowRect, GetWindowTextLengthW, GetWindowTextW, IsDialogMessageW, IsIconic, IsWindow, KillTimer, LoadCursorW,
     MessageBoxW, PostMessageW, PostQuitMessage, RegisterClassW, SendMessageW, SetTimer,
@@ -80,7 +81,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     TrackPopupMenuEx, TranslateMessage, CS_DBLCLKS, CS_HREDRAW, CS_VREDRAW, CW_USEDEFAULT, ES_AUTOHSCROLL,
     GWLP_USERDATA, GWLP_WNDPROC, HMENU, IDCANCEL, IDC_ARROW, IDYES,
     MB_ICONINFORMATION, MB_ICONQUESTION, MB_ICONWARNING, MB_OK, MB_YESNO, MB_YESNOCANCEL,
-    MF_BYCOMMAND, MF_CHECKED,
+    MF_BYCOMMAND, MF_BYPOSITION, MF_CHECKED,
     MF_POPUP, MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MSG, SB_BOTTOM, SB_LINEDOWN,
     SB_LINEUP, SB_PAGEDOWN, SB_PAGEUP, SB_THUMBPOSITION, SB_THUMBTRACK, SB_TOP, SB_VERT,
     SCROLLINFO, SC_KEYMENU, SIF_PAGE, SIF_POS, SIF_RANGE, SWP_NOACTIVATE, SWP_NOZORDER, SW_RESTORE,
@@ -233,6 +234,25 @@ fn menu_raw(store: &mut Vec<Vec<u16>>, text: &str) -> PCWSTR {
 fn menu_text(store: &mut Vec<Vec<u16>>, text: &str) -> PCWSTR {
     let translated = i18n::tr(text);
     menu_raw(store, &translated)
+}
+
+/// Rebuilds the File menu in place, so newly opened files show up in the
+/// recent-files list without restarting the editor.
+unsafe fn build_file_menu(file: HMENU, recent: &[String], labels: &mut Vec<Vec<u16>>) {
+    while DeleteMenu(file, 0, MF_BYPOSITION).is_ok() {}
+    labels.clear();
+    let _ = AppendMenuW(file, MF_STRING, 101, menu_text(labels, "New"));
+    let _ = AppendMenuW(file, MF_STRING, 102, menu_text(labels, "Open..."));
+    let _ = AppendMenuW(file, MF_STRING, ID_SAVE, menu_text(labels, "Save"));
+    let _ = AppendMenuW(file, MF_STRING, 104, menu_text(labels, "Save as..."));
+    if !recent.is_empty() {
+        let _ = AppendMenuW(file, MF_SEPARATOR, 0, w!(""));
+        for (index, path) in recent.iter().take(10).enumerate() {
+            let _ = AppendMenuW(file, MF_STRING, 500 + index, menu_raw(labels, path));
+        }
+    }
+    let _ = AppendMenuW(file, MF_SEPARATOR, 0, w!(""));
+    let _ = AppendMenuW(file, MF_STRING, ID_EXIT, menu_text(labels, "Exit"));
 }
 
 fn scale(value: i32, dpi: u32) -> i32 {
@@ -1692,6 +1712,8 @@ struct App {
     selection: HashSet<usize>,
     selection_anchor: Option<usize>,
     labels: Labels,
+    /// Label buffers of the rebuildable File menu; `AppendMenuW` keeps pointers.
+    menu_labels: Vec<Vec<u16>>,
     scroll_test_left: usize,
     doc_path: Option<PathBuf>,
     dirty: bool,
@@ -1805,6 +1827,7 @@ impl App {
             selection: HashSet::new(),
             selection_anchor: None,
             labels: Labels::new(),
+            menu_labels: Vec::new(),
             scroll_test_left: if SCROLL_TEST.load(Ordering::Relaxed) { 1500 } else { 0 },
             doc_path: startup_path,
             dirty: false,
@@ -2225,6 +2248,7 @@ impl App {
                     &mut self.recent_files,
                     &path.to_string_lossy(),
                 );
+                self.rebuild_file_menu(hwnd);
                 last = Some(index);
                 continue;
             }
@@ -2246,6 +2270,7 @@ impl App {
                 }
             };
             settings::push_recent(&mut self.recent_files, &path_string);
+            self.rebuild_file_menu(hwnd);
             let title = path
                 .file_name()
                 .map(|name| name.to_string_lossy().into_owned())
@@ -2315,6 +2340,7 @@ impl App {
                 .map(|path| path.to_string_lossy().into_owned())
                 .unwrap_or_default();
             settings::push_recent(&mut self.recent_files, &path_string);
+            self.rebuild_file_menu(hwnd);
             self.capture_active_tab();
             self.save_hotkeys();
             self.update_title(hwnd);
@@ -2623,6 +2649,15 @@ impl App {
             }
         }
         let _ = hwnd;
+    }
+
+    unsafe fn rebuild_file_menu(&mut self, hwnd: HWND) {
+        let file = GetSubMenu(GetMenu(hwnd), 0);
+        if file.0.is_null() {
+            return;
+        }
+        build_file_menu(file, &self.recent_files, &mut self.menu_labels);
+        let _ = DrawMenuBar(hwnd);
     }
 
     unsafe fn update_title(&self, hwnd: HWND) {
@@ -7391,23 +7426,7 @@ fn main() -> windows::core::Result<()> {
         // Menu labels must outlive the menu handles attached to the window.
         let mut menu_texts: Vec<Vec<u16>> = Vec::new();
         let file = CreatePopupMenu()?;
-        let _ = AppendMenuW(file, MF_STRING, 101, menu_text(&mut menu_texts, "New"));
-        let _ = AppendMenuW(file, MF_STRING, 102, menu_text(&mut menu_texts, "Open..."));
-        let _ = AppendMenuW(file, MF_STRING, ID_SAVE, menu_text(&mut menu_texts, "Save"));
-        let _ = AppendMenuW(file, MF_STRING, 104, menu_text(&mut menu_texts, "Save as..."));
-        if !recent_files.is_empty() {
-            let _ = AppendMenuW(file, MF_SEPARATOR, 0, w!(""));
-            for (index, path) in recent_files.iter().take(10).enumerate() {
-                let _ = AppendMenuW(
-                    file,
-                    MF_STRING,
-                    500 + index,
-                    menu_raw(&mut menu_texts, path),
-                );
-            }
-        }
-        let _ = AppendMenuW(file, MF_SEPARATOR, 0, w!(""));
-        let _ = AppendMenuW(file, MF_STRING, ID_EXIT, menu_text(&mut menu_texts, "Exit"));
+        build_file_menu(file, &recent_files, &mut menu_texts);
         let _ = AppendMenuW(menu, MF_POPUP, file.0 as usize, menu_text(&mut menu_texts, "File"));
         let edit = CreatePopupMenu()?;
         let _ = AppendMenuW(edit, MF_STRING, 111, menu_text(&mut menu_texts, "Cut"));
