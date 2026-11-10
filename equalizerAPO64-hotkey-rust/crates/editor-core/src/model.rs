@@ -269,6 +269,41 @@ impl Default for GraphicEqEditor {
     }
 }
 
+/// Replaces a single decimal comma inside each numeric token, so mixed
+/// formats like `1000,5 3.5` are parsed as two correct values instead of
+/// splitting the first one at the comma.
+fn normalize_decimal_commas(parameters: &str) -> String {
+    fn has_decimal_comma(token: &str) -> bool {
+        !token.is_empty()
+            && !token.contains('.')
+            && token.matches(',').count() == 1
+            && token
+                .chars()
+                .all(|ch| ch.is_ascii_digit() || matches!(ch, ',' | '+' | '-'))
+    }
+    let mut result = String::with_capacity(parameters.len());
+    let mut token = String::new();
+    for ch in parameters.chars() {
+        if ch == ';' || ch.is_whitespace() {
+            if has_decimal_comma(&token) {
+                result.push_str(&token.replace(',', "."));
+            } else {
+                result.push_str(&token);
+            }
+            token.clear();
+            result.push(ch);
+        } else {
+            token.push(ch);
+        }
+    }
+    if has_decimal_comma(&token) {
+        result.push_str(&token.replace(',', "."));
+    } else {
+        result.push_str(&token);
+    }
+    result
+}
+
 impl GraphicEqEditor {
     pub fn bands15() -> &'static [f64] {
         &[25.0, 40.0, 63.0, 100.0, 160.0, 250.0, 400.0, 630.0, 1000.0, 1600.0, 2500.0, 4000.0, 6300.0, 10000.0, 16000.0]
@@ -292,7 +327,7 @@ impl GraphicEqEditor {
 
     pub fn parse(parameters: &str) -> Option<Self> {
         let mut ed = GraphicEqEditor::default();
-        let value = if !parameters.contains('.') { parameters.replace(',', ".") } else { parameters.to_string() };
+        let value = normalize_decimal_commas(parameters);
         let re = regex::Regex::new(r"[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?").ok()?;
         let mut numbers = re.find_iter(&value).filter_map(|m| m.as_str().parse::<f64>().ok());
         while let (Some(freq), Some(db_gain)) = (numbers.next(), numbers.next()) {
