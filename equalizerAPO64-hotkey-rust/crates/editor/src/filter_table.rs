@@ -936,10 +936,10 @@ pub fn save_config_file(path: &str, lines: &[String]) -> std::io::Result<()> {
             Err(e) => {
                 let sharing = e.raw_os_error() == Some(32);
                 attempts += 1;
-                if !sharing || attempts > 2000 {
+                if !sharing || attempts > 200 {
                     return Err(e);
                 }
-                std::thread::sleep(std::time::Duration::from_millis(1));
+                std::thread::sleep(std::time::Duration::from_millis(10));
             }
         }
     }
@@ -953,10 +953,10 @@ pub fn load_config_lines(path: &str) -> std::io::Result<Vec<String>> {
             Err(e) => {
                 let sharing = e.raw_os_error() == Some(32);
                 attempts += 1;
-                if !sharing || attempts > 2000 {
+                if !sharing || attempts > 200 {
                     return Err(e);
                 }
-                std::thread::sleep(std::time::Duration::from_millis(1));
+                std::thread::sleep(std::time::Duration::from_millis(10));
             }
         }
     };
