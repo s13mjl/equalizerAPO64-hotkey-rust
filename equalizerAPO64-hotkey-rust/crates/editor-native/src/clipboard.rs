@@ -2,7 +2,7 @@
 
 use std::ptr::copy_nonoverlapping;
 
-use windows::Win32::Foundation::{HANDLE, HGLOBAL};
+use windows::Win32::Foundation::{GlobalFree, HANDLE, HGLOBAL};
 use windows::Win32::System::DataExchange::{
     CloseClipboard, EmptyClipboard, GetClipboardData, IsClipboardFormatAvailable, OpenClipboard,
     SetClipboardData,
@@ -14,7 +14,10 @@ pub unsafe fn set_text(text: &str) -> bool {
     if OpenClipboard(None).is_err() {
         return false;
     }
-    let _ = EmptyClipboard();
+    if EmptyClipboard().is_err() {
+        let _ = CloseClipboard();
+        return false;
+    }
     let mut units: Vec<u16> = text.encode_utf16().collect();
     units.push(0);
     let bytes = units.len() * 2;
@@ -23,13 +26,20 @@ pub unsafe fn set_text(text: &str) -> bool {
         return false;
     };
     let pointer = GlobalLock(memory) as *mut u16;
-    if !pointer.is_null() {
-        copy_nonoverlapping(units.as_ptr(), pointer, units.len());
-        let _ = GlobalUnlock(memory);
-        let _ = SetClipboardData(CF_UNICODETEXT.0 as u32, Some(HANDLE(memory.0)));
+    if pointer.is_null() {
+        let _ = GlobalFree(Some(memory));
+        let _ = CloseClipboard();
+        return false;
+    }
+    copy_nonoverlapping(units.as_ptr(), pointer, units.len());
+    let _ = GlobalUnlock(memory);
+    let stored = SetClipboardData(CF_UNICODETEXT.0 as u32, Some(HANDLE(memory.0))).is_ok();
+    if !stored {
+        // On failure the system did not take ownership of the block.
+        let _ = GlobalFree(Some(memory));
     }
     let _ = CloseClipboard();
-    true
+    stored
 }
 
 pub unsafe fn get_text() -> Option<String> {
