@@ -2450,16 +2450,19 @@ impl App {
     }
 
     fn poll_analysis(&mut self, hwnd: HWND) -> bool {
-        if let Some(result) = self.analysis.try_recv() {
+        let mut updated = false;
+        while let Some(result) = self.analysis.try_recv() {
             if result.generation == self.analysis_generation {
                 self.analysis_result = Some(result);
-                unsafe {
-                    let _ = InvalidateRect(Some(hwnd), None, false);
-                }
-                return true;
+                updated = true;
             }
         }
-        false
+        if updated {
+            unsafe {
+                let _ = InvalidateRect(Some(hwnd), None, false);
+            }
+        }
+        updated
     }
 
     fn poll_volume(&mut self, hwnd: HWND) {
