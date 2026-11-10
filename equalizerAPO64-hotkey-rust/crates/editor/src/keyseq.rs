@@ -88,6 +88,17 @@ pub enum KeyCode {
     Print,
     ScrollLock,
     Pause,
+    Comma,
+    Period,
+    Slash,
+    Backslash,
+    Semicolon,
+    Quote,
+    OpenBracket,
+    CloseBracket,
+    Minus,
+    Equal,
+    Backtick,
 }
 
 impl KeyCode {
@@ -140,6 +151,17 @@ impl KeyCode {
             KeyCode::Print => "Print".into(),
             KeyCode::ScrollLock => "ScrollLock".into(),
             KeyCode::Pause => "Pause".into(),
+            KeyCode::Comma => ",".into(),
+            KeyCode::Period => ".".into(),
+            KeyCode::Slash => "/".into(),
+            KeyCode::Backslash => "\\".into(),
+            KeyCode::Semicolon => ";".into(),
+            KeyCode::Quote => "'".into(),
+            KeyCode::OpenBracket => "[".into(),
+            KeyCode::CloseBracket => "]".into(),
+            KeyCode::Minus => "-".into(),
+            KeyCode::Equal => "=".into(),
+            KeyCode::Backtick => "`".into(),
         }
     }
 
@@ -197,6 +219,17 @@ impl KeyCode {
             KeyCode::Print => 0x2A,
             KeyCode::ScrollLock => 0x91,
             KeyCode::Pause => 0x13,
+            KeyCode::Semicolon => 0xBA,
+            KeyCode::Equal => 0xBB,
+            KeyCode::Comma => 0xBC,
+            KeyCode::Minus => 0xBD,
+            KeyCode::Period => 0xBE,
+            KeyCode::Slash => 0xBF,
+            KeyCode::Backtick => 0xC0,
+            KeyCode::OpenBracket => 0xDB,
+            KeyCode::Backslash => 0xDC,
+            KeyCode::CloseBracket => 0xDD,
+            KeyCode::Quote => 0xDE,
         }
     }
 
@@ -250,6 +283,17 @@ impl KeyCode {
             0x2A => Some(KeyCode::Print),
             0x91 => Some(KeyCode::ScrollLock),
             0x13 => Some(KeyCode::Pause),
+            0xBA => Some(KeyCode::Semicolon),
+            0xBB => Some(KeyCode::Equal),
+            0xBC => Some(KeyCode::Comma),
+            0xBD => Some(KeyCode::Minus),
+            0xBE => Some(KeyCode::Period),
+            0xBF => Some(KeyCode::Slash),
+            0xC0 => Some(KeyCode::Backtick),
+            0xDB => Some(KeyCode::OpenBracket),
+            0xDC => Some(KeyCode::Backslash),
+            0xDD => Some(KeyCode::CloseBracket),
+            0xDE => Some(KeyCode::Quote),
             _ => None,
         }
     }
@@ -266,6 +310,22 @@ impl KeyCode {
             }
             if c.is_ascii_digit() {
                 return Some(KeyCode::Digit(c as u8 - b'0'));
+            }
+            if let Some(key) = match c {
+                ',' => Some(KeyCode::Comma),
+                '.' => Some(KeyCode::Period),
+                '/' => Some(KeyCode::Slash),
+                '\\' => Some(KeyCode::Backslash),
+                ';' => Some(KeyCode::Semicolon),
+                '\'' => Some(KeyCode::Quote),
+                '[' => Some(KeyCode::OpenBracket),
+                ']' => Some(KeyCode::CloseBracket),
+                '-' => Some(KeyCode::Minus),
+                '=' => Some(KeyCode::Equal),
+                '`' => Some(KeyCode::Backtick),
+                _ => None,
+            } {
+                return Some(key);
             }
         }
         let lower = s.to_ascii_lowercase();
