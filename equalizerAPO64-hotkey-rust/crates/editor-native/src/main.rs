@@ -2887,6 +2887,7 @@ impl App {
                 self.rows[edit.row].item = None;
                 self.dirty = true;
                 self.update_title(hwnd);
+                self.update_scrollbar(hwnd);
                 self.save_hotkeys();
                 self.autosave(hwnd);
             }
@@ -3211,6 +3212,7 @@ impl App {
         self.selected = Some(index);
         self.dirty = true;
         self.recompute_prefix();
+        self.update_scrollbar(hwnd);
         self.ensure_visible(hwnd, index);
         self.update_title(hwnd);
         self.save_hotkeys();
@@ -3246,6 +3248,7 @@ impl App {
         self.selection_anchor = self.selected;
         self.dirty = true;
         self.recompute_prefix();
+        self.update_scrollbar(hwnd);
         self.save_hotkeys();
         self.reload_hotkeys();
         self.update_title(hwnd);
@@ -3328,6 +3331,7 @@ impl App {
         self.selection_anchor = inserted.first().copied();
         self.dirty = true;
         self.recompute_prefix();
+        self.update_scrollbar(hwnd);
         self.update_title(hwnd);
         self.save_hotkeys();
         self.start_analysis();
