@@ -122,12 +122,6 @@ fn main() {
                 std::process::exit(1);
             }
         }
-        let _ = registry_helper::write_value(
-            UPDATE_CHECKER_REGPATH,
-            "lastCheckDate",
-            &format_local_iso_now(),
-        );
-
         let skip_version = registry_helper::read_value(UPDATE_CHECKER_REGPATH, "skipVersion")
             .ok()
             .unwrap_or_default();
@@ -153,6 +147,16 @@ fn main() {
             std::process::exit(0);
         }
         HttpOutcome::Ok(body) => {
+            // Only a successful response counts as the daily check; a failed
+            // attempt should be retried on the next logon instead of waiting
+            // another 24 hours.
+            if mode == Mode::Auto {
+                let _ = registry_helper::write_value(
+                    UPDATE_CHECKER_REGPATH,
+                    "lastCheckDate",
+                    &format_local_iso_now(),
+                );
+            }
             if body.is_empty() {
                 if mode != Mode::Auto {
                     run_info_message(
