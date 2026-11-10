@@ -85,7 +85,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     MF_POPUP, MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MF_GRAYED, MSG, SB_BOTTOM, SB_LINEDOWN,
     SB_LINEUP, SB_PAGEDOWN, SB_PAGEUP, SB_THUMBPOSITION, SB_THUMBTRACK, SB_TOP, SB_VERT,
     SCROLLINFO, SC_KEYMENU, SIF_PAGE, SIF_POS, SIF_RANGE, SWP_NOACTIVATE, SWP_NOZORDER, SW_RESTORE,
-    SW_SHOW, SW_SHOWNORMAL,
+    SW_SHOW, SW_SHOWMAXIMIZED, SW_SHOWNORMAL,
     TPM_RETURNCMD, WM_APP, WM_CHAR, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_DPICHANGED,
     WM_ERASEBKGND, WM_KEYDOWN, WM_KILLFOCUS, WM_LBUTTONDBLCLK, WM_LBUTTONDOWN, WM_LBUTTONUP,
     WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_NCDESTROY, WM_PAINT, WM_PRINTCLIENT, WM_RBUTTONDOWN, WM_SETFONT,
@@ -3053,6 +3053,9 @@ impl App {
         // Use the real screen rectangle so the saved position matches the
         // coordinates CreateWindowExW expects.  Minimized and maximized
         // windows have no meaningful normal rectangle; keep the last values.
+        if !IsIconic(hwnd).as_bool() {
+            prefs.window_maximized = IsZoomed(hwnd).as_bool();
+        }
         if !IsIconic(hwnd).as_bool() && !IsZoomed(hwnd).as_bool() {
             let mut rect = RECT::default();
             if GetWindowRect(hwnd, &mut rect).is_ok() {
@@ -8054,6 +8057,9 @@ fn main() -> windows::core::Result<()> {
             None,
         )?;
         let _ = ShowWindow(hwnd, SW_SHOW);
+        if window_prefs.window_maximized {
+            let _ = ShowWindow(hwnd, SW_SHOWMAXIMIZED);
+        }
         if IsIconic(hwnd).as_bool() {
             let _ = ShowWindow(hwnd, SW_RESTORE);
         }

@@ -67,6 +67,7 @@ pub struct GlobalPreferences {
     pub recent_files: Vec<String>,
     pub window_size: Option<(f32, f32)>,
     pub window_pos: Option<(f32, f32)>,
+    pub window_maximized: bool,
     pub language: Option<String>,
     pub show_toolbar: bool,
     pub show_analysis: bool,
@@ -89,6 +90,7 @@ impl Default for GlobalPreferences {
             recent_files: Vec::new(),
             window_size: None,
             window_pos: None,
+            window_maximized: false,
             language: None,
             show_toolbar: true,
             show_analysis: true,
@@ -134,6 +136,7 @@ impl GlobalPreferences {
                 }
             }
         }
+        p.window_maximized = read_bool(EDITOR_REGPATH, "windowMaximized", false);
         p
     }
 
@@ -157,6 +160,7 @@ impl GlobalPreferences {
         if let Some((x, y)) = self.window_pos {
             let _ = eapo_common::registry_helper::write_value(EDITOR_REGPATH, "windowPos", &format!("{x},{y}"));
         }
+        write_bool(EDITOR_REGPATH, "windowMaximized", self.window_maximized);
         write_bool(EDITOR_REGPATH, "showToolbar", self.show_toolbar);
         write_bool(EDITOR_REGPATH, "showAnalysisPanel", self.show_analysis);
         let _ = eapo_common::registry_helper::write_value(
