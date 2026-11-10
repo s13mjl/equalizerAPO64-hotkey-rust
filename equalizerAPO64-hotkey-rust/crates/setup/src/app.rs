@@ -861,7 +861,9 @@ impl eframe::App for SetupApp {
             self.header(ui);
             ui.separator();
             ui.add_space(6.0);
-            self.content(ui);
+            egui::ScrollArea::vertical()
+                .auto_shrink([false, false])
+                .show(ui, |ui| self.content(ui));
         });
     }
 
