@@ -842,6 +842,13 @@ unsafe extern "system" fn copy_proc(
                 }
                 ID_TAB_GRAPH | ID_TAB_ASSIGN => {
                     if let Some(state) = state_of(hwnd) {
+                        // Read the visible editors into `working` before the
+                        // tab switch destroys them, otherwise edits made on
+                        // the Assignments tab are lost (and the graph shows
+                        // stale values).
+                        if state.tab == 1 && !state.rows.is_empty() {
+                            collect(state);
+                        }
                         state.tab = if id == ID_TAB_GRAPH { 0 } else { 1 };
                         state.scroll = 0;
                         rebuild(hwnd);
