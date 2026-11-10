@@ -580,7 +580,7 @@ impl EditorApp {
     fn save_preferences(&mut self) {
         if !self.no_save_preferences {
             let size = self.window_size;
-            let mut prefs = GlobalPreferences::default();
+            let mut prefs = GlobalPreferences::load();
             prefs.instant_mode = self.instant_mode;
             prefs.selected_device = self
                 .selected_device
