@@ -40,7 +40,16 @@ pub fn log_hotkey(message: &str) {
         "{:04}-{:02}-{:02} {:02}:{:02}:{:02}.{:03}",
         st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond, st.wMilliseconds
     );
-    if let Ok(mut f) = OpenOptions::new().create(true).append(true).open(hotkey_log_path()) {
+    let path = hotkey_log_path();
+    // Keep the diagnostic file bounded; it is written on every hotkey press.
+    const MAX_LOG_BYTES: u64 = 1_048_576;
+    if std::fs::metadata(&path)
+        .map(|metadata| metadata.len() > MAX_LOG_BYTES)
+        .unwrap_or(false)
+    {
+        let _ = std::fs::remove_file(&path);
+    }
+    if let Ok(mut f) = OpenOptions::new().create(true).append(true).open(path) {
         let _ = writeln!(f, "{timestamp} {message}");
     }
 }
