@@ -693,7 +693,13 @@ impl eframe::App for MessageDialog {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.heading(&self.title);
             ui.add_space(8.0);
-            ui.label(&self.message);
+            let message_height = (ui.available_height() - 56.0).max(40.0);
+            egui::ScrollArea::vertical()
+                .max_height(message_height)
+                .auto_shrink([false, false])
+                .show(ui, |ui| {
+                    ui.label(&self.message);
+                });
             ui.add_space(8.0);
             if let Some((text, checked)) = &mut self.checkbox {
                 ui.checkbox(checked, text.as_str());
