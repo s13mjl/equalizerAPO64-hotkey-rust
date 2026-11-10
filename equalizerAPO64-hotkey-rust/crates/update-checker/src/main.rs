@@ -555,7 +555,7 @@ fn native_options(width: f32, height: f32, title: &str) -> eframe::NativeOptions
 
 fn run_update_dialog(data: UpdateData) {
     let title = i18n::tr("Update available");
-    let options = native_options(400.0, 340.0, &title);
+    let options = native_options(460.0, 340.0, &title);
     let _ = eframe::run_native(
         &title,
         options,
