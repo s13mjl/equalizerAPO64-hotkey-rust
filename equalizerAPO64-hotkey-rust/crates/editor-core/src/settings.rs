@@ -626,4 +626,32 @@ mod tests {
         let remaining = hotkey_keys(&[line.to_string()]);
         assert_eq!(remaining[0], keys[0]);
     }
+
+    #[test]
+    fn row_state_and_bindings_round_trip_per_path() {
+        let path = std::env::temp_dir().join(format!(
+            "eapo_settings_round_trip_{}.txt",
+            std::process::id()
+        ));
+        let path = path.to_string_lossy().into_owned();
+        let key = file_pref_key(&path);
+        delete_tree(&key);
+
+        let mut prefs = serde_json::Map::new();
+        prefs.insert("vstEmbed".to_string(), JsonValue::Bool(true));
+        save_row_state(&path, &[(3, "Filter".to_string(), prefs)]);
+        let loaded = load_row_state(&path);
+        assert_eq!(
+            loaded.get(&3).map(|(command, _)| command.as_str()),
+            Some("Filter")
+        );
+
+        let sequence = crate::keyseq::KeySequence::parse("Ctrl+Alt+K").unwrap();
+        let keys = hotkey_keys(&["Preamp: 0 dB".to_string()]);
+        save_hotkey_bindings(&path, &[(keys[0].clone(), sequence)]);
+        let bindings = load_hotkey_bindings(&path);
+        assert_eq!(bindings.get(&keys[0]).copied(), Some(sequence));
+
+        delete_tree(&key);
+    }
 }

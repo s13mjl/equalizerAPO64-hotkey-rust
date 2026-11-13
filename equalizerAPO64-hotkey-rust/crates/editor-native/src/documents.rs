@@ -483,7 +483,7 @@ impl App {
                 dirty: false,
             });
         }
-        let next = index.min(self.tabs.len() - 1);
+        let next = next_tab_after_close(self.tabs.len(), index);
         self.active_tab = usize::MAX;
         self.load_tab(hwnd, next);
         // Closing the last saved document means the editor no longer follows

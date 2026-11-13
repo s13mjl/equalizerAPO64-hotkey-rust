@@ -342,6 +342,15 @@ pub(crate) fn clamp_scroll_offset(total: u32, viewport: i32, offset: i32) -> i32
     offset.clamp(0, (total as i32 - viewport).max(0))
 }
 
+/// Index of the tab that becomes active after the tab at `closed` is removed.
+pub(crate) fn next_tab_after_close(remaining: usize, closed: usize) -> usize {
+    if remaining == 0 {
+        0
+    } else {
+        closed.min(remaining - 1)
+    }
+}
+
 pub(crate) fn point_in(rect: &RECT, x: i32, y: i32) -> bool {
     x >= rect.left && x < rect.right && y >= rect.top && y < rect.bottom
 }
@@ -439,5 +448,22 @@ mod tests {
         assert_eq!(shorten("abcdef", 5), "ab...");
         // Width is counted in characters, not bytes.
         assert_eq!(shorten("中文测试", 3), "...");
+    }
+
+    #[test]
+    fn tab_to_activate_after_closing_stays_in_range() {
+        assert_eq!(next_tab_after_close(0, 0), 0);
+        assert_eq!(next_tab_after_close(3, 0), 0);
+        assert_eq!(next_tab_after_close(3, 2), 2);
+        // Closing the last tab activates the new last tab.
+        assert_eq!(next_tab_after_close(3, 5), 2);
+    }
+
+    #[test]
+    fn geq_table_top_never_scrolls_past_the_last_page() {
+        assert_eq!(geq_table_top_clamped(0, 10, 3), 0);
+        assert_eq!(geq_table_top_clamped(9, 10, 3), 7);
+        assert_eq!(geq_table_top_clamped(4, 10, 3), 4);
+        assert_eq!(geq_table_top_clamped(2, 2, 5), 0);
     }
 }
