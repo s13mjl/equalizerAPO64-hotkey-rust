@@ -952,6 +952,10 @@ impl Drop for App {
 
 fn main() -> windows::core::Result<()> {
     palette::refresh();
+    // Hotkeys now live in `rowPrefs`/`hotkeyBindings` next to the filter they
+    // belong to.  Drop the legacy per-filter registry tree so IDs from older
+    // sessions do not linger.
+    eapo_editor_core::hotkey::save_hotkeys_to(eapo_editor_core::hotkey::HOTKEY_REGPATH, &[]);
     let args: Vec<String> = std::env::args().skip(1).collect();
     #[cfg(debug_assertions)]
     {
