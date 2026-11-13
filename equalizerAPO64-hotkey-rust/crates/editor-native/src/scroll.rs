@@ -5,8 +5,7 @@ use super::*;
 impl App {
     pub(super) unsafe fn update_scrollbar(&mut self, hwnd: HWND) {
         let viewport = self.viewport_height(hwnd);
-        let max_offset = (self.total as i32 - viewport).max(0);
-        self.offset = self.offset.clamp(0, max_offset);
+        self.offset = clamp_scroll_offset(self.total, viewport, self.offset);
         let info = SCROLLINFO {
             cbSize: size_of::<SCROLLINFO>() as u32,
             fMask: SIF_RANGE | SIF_PAGE | SIF_POS,

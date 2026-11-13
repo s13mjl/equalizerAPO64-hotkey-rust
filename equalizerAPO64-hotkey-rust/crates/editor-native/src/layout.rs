@@ -336,6 +336,12 @@ pub(crate) fn shorten(text: &str, max: usize) -> String {
     }
 }
 
+/// Keeps the scroll offset inside `0..=total - viewport` after rows change
+/// height or are removed.
+pub(crate) fn clamp_scroll_offset(total: u32, viewport: i32, offset: i32) -> i32 {
+    offset.clamp(0, (total as i32 - viewport).max(0))
+}
+
 pub(crate) fn point_in(rect: &RECT, x: i32, y: i32) -> bool {
     x >= rect.left && x < rect.right && y >= rect.top && y < rect.bottom
 }
@@ -411,5 +417,27 @@ pub(crate) fn biquad_kind_display(kind: BiquadKind) -> String {
         biquad_kind_label(kind).to_string()
     } else {
         i18n::tr(biquad_kind_source(kind))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn scroll_offset_clamps_to_content() {
+        assert_eq!(clamp_scroll_offset(1000, 400, 900), 600);
+        assert_eq!(clamp_scroll_offset(1000, 400, 100), 100);
+        // Content shorter than the viewport always scrolls back to the top.
+        assert_eq!(clamp_scroll_offset(300, 400, 120), 0);
+        assert_eq!(clamp_scroll_offset(1000, 400, -20), 0);
+    }
+
+    #[test]
+    fn shorten_adds_ellipsis_only_when_needed() {
+        assert_eq!(shorten("GraphicEQ", 20), "GraphicEQ");
+        assert_eq!(shorten("abcdef", 5), "ab...");
+        // Width is counted in characters, not bytes.
+        assert_eq!(shorten("中文测试", 3), "...");
     }
 }
