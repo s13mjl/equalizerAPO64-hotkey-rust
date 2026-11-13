@@ -565,6 +565,13 @@ struct App {
     /// Instant-mode writes are debounced; dragging a slider must not rewrite
     /// the configuration dozens of times per second.
     autosave_due: Option<std::time::Instant>,
+    /// Background writer so the UI thread never waits for the engine to
+    /// release the configuration file.
+    instant_save_tx: Option<std::sync::mpsc::Sender<(u64, PathBuf, Vec<String>)>>,
+    instant_save_rx: std::sync::mpsc::Receiver<(u64, std::io::Result<()>)>,
+    instant_save_thread: Option<std::thread::JoinHandle<()>>,
+    instant_save_serial: u64,
+    instant_save_in_flight: usize,
     recent_files: Vec<String>,
     analysis_resolution: i32,
     analysis_effective_resolution: i32,
@@ -665,6 +672,19 @@ impl App {
         } else {
             None
         };
+        // Serialize instant-mode writes on a worker thread.  Snapshots are
+        // written in order, so an older write can never overwrite a newer one.
+        let (instant_save_tx, instant_save_jobs) =
+            std::sync::mpsc::channel::<(u64, PathBuf, Vec<String>)>();
+        let (instant_save_results, instant_save_rx) = std::sync::mpsc::channel();
+        let instant_save_thread = std::thread::spawn(move || {
+            while let Ok((serial, path, lines)) = instant_save_jobs.recv() {
+                let result = save_config_file(&path.to_string_lossy(), &lines);
+                if instant_save_results.send((serial, result)).is_err() {
+                    break;
+                }
+            }
+        });
         let mut app = Self {
             dpi: dpi.max(96),
             body: HFONT::default(),
@@ -706,6 +726,11 @@ impl App {
             restart_after_close: false,
             instant_mode,
             autosave_due: None,
+            instant_save_tx: Some(instant_save_tx),
+            instant_save_rx,
+            instant_save_thread: Some(instant_save_thread),
+            instant_save_serial: 0,
+            instant_save_in_flight: 0,
             recent_files,
             analysis_resolution,
             analysis_effective_resolution: analysis_resolution,
@@ -953,6 +978,12 @@ impl App {
 
 impl Drop for App {
     fn drop(&mut self) {
+        // Close the job channel and wait for the worker to write everything
+        // that was already queued; a snapshot must never be dropped on exit.
+        self.instant_save_tx.take();
+        if let Some(thread) = self.instant_save_thread.take() {
+            let _ = thread.join();
+        }
         unsafe { self.destroy_fonts() };
     }
 }

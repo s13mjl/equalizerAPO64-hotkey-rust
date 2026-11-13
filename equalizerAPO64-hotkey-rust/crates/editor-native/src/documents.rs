@@ -263,6 +263,9 @@ impl App {
 
     pub(super) unsafe fn save(&mut self, hwnd: HWND) -> bool {
         self.autosave_due = None;
+        // Finish any queued background write first so an older snapshot cannot
+        // land after this synchronous one.
+        self.wait_instant_save(hwnd);
         if self.doc_path.is_none() {
             return self.save_as(hwnd);
         }
@@ -311,6 +314,92 @@ impl App {
         if self.autosave_due.take().is_some() && self.instant_mode && self.doc_path.is_some() {
             self.save(hwnd);
         }
+    }
+
+    /// Hands the current snapshot to the background writer.  Used by the
+    /// debounced instant-mode path, where waiting for the engine to release
+    /// the file would freeze dragging.
+    pub(super) fn begin_instant_save(&mut self) {
+        self.autosave_due = None;
+        if !self.instant_mode {
+            return;
+        }
+        let Some(path) = self.doc_path.clone() else {
+            return;
+        };
+        let Some(sender) = self.instant_save_tx.as_ref() else {
+            return;
+        };
+        self.instant_save_serial += 1;
+        let serial = self.instant_save_serial;
+        let lines: Vec<String> = self.rows.iter().map(|row| row.line.clone()).collect();
+        if sender.send((serial, path, lines)).is_ok() {
+            self.instant_save_in_flight += 1;
+        }
+    }
+
+    /// Collects background write results and clears the dirty flag only when
+    /// no newer snapshot was queued in the meantime.
+    pub(super) unsafe fn poll_instant_save(&mut self, hwnd: HWND) {
+        loop {
+            let outcome = self.instant_save_rx.try_recv();
+            let Ok((serial, result)) = outcome else {
+                break;
+            };
+            self.instant_save_in_flight = self.instant_save_in_flight.saturating_sub(1);
+            match result {
+                Ok(()) => {
+                    // The snapshot is on disk now, so the analysis panel can
+                    // reflect it.
+                    self.start_analysis();
+                    // A newer edit may already be scheduled but not sent yet.
+                    if serial == self.instant_save_serial && self.autosave_due.is_none() {
+                        self.dirty = false;
+                        self.update_title(hwnd);
+                    }
+                }
+                Err(error) => {
+                    self.report_save_error(hwnd, &error);
+                }
+            }
+        }
+    }
+
+    /// Blocks until every queued background write has finished.  Called by
+    /// synchronous saves so a stale snapshot can never land after the newer
+    /// one.
+    pub(super) unsafe fn wait_instant_save(&mut self, hwnd: HWND) {
+        while self.instant_save_in_flight > 0 {
+            match self.instant_save_rx.recv() {
+                Ok((serial, result)) => {
+                    self.instant_save_in_flight -= 1;
+                    if result.is_ok() && serial == self.instant_save_serial {
+                        self.dirty = false;
+                    } else if let Err(error) = result {
+                        self.report_save_error(hwnd, &error);
+                    }
+                }
+                Err(_) => {
+                    self.instant_save_in_flight = 0;
+                }
+            }
+        }
+    }
+
+    unsafe fn report_save_error(&self, hwnd: HWND, error: &std::io::Error) {
+        let Some(path) = self.doc_path.clone() else {
+            return;
+        };
+        let text = wide_z(&i18n::tr_arg(
+            "Could not save %0: %1",
+            &[&path.display().to_string(), &error.to_string()],
+        ));
+        let _ = MessageBoxW(
+            Some(hwnd),
+            PCWSTR(text.as_ptr()),
+            w!("Equalizer APO"),
+            MB_ICONWARNING,
+        );
     }
 
     /// Asks for every dirty tab before the window closes.  Saving a tab that is

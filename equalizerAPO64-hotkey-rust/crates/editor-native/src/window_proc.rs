@@ -444,8 +444,9 @@ pub(crate) unsafe extern "system" fn main_window_proc(
                         .autosave_due
                         .is_some_and(|due| std::time::Instant::now() >= due)
                     {
-                        state.flush_autosave(hwnd);
+                        state.begin_instant_save();
                     }
+                    state.poll_instant_save(hwnd);
                 }
             }
             LRESULT(0)
