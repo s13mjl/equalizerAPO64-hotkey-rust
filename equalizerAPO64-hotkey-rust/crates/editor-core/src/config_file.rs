@@ -38,10 +38,13 @@ pub fn save_config_file(path: &str, lines: &[String]) -> std::io::Result<()> {
             Err(error) => {
                 let sharing = error.raw_os_error() == Some(32);
                 attempts += 1;
-                if !sharing || attempts > 200 {
+                // A locked configuration is usually released within a few
+                // milliseconds.  Keep the worst-case UI stall near one second
+                // instead of blocking for two.
+                if !sharing || attempts > 50 {
                     return Err(error);
                 }
-                std::thread::sleep(Duration::from_millis(10));
+                std::thread::sleep(Duration::from_millis(20));
             }
         }
     }
@@ -55,10 +58,10 @@ pub fn load_config_lines(path: &str) -> std::io::Result<Vec<String>> {
             Err(error) => {
                 let sharing = error.raw_os_error() == Some(32);
                 attempts += 1;
-                if !sharing || attempts > 200 {
+                if !sharing || attempts > 50 {
                     return Err(error);
                 }
-                std::thread::sleep(Duration::from_millis(10));
+                std::thread::sleep(Duration::from_millis(20));
             }
         }
     };
