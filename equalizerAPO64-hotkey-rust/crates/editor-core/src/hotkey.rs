@@ -79,6 +79,7 @@ struct WorkerShared {
     thread_id: AtomicU32,
     stopping: AtomicBool,
     events: Mutex<Sender<i32>>,
+    wake: Mutex<Option<Arc<dyn Fn() + Send + Sync>>>,
 }
 
 pub struct HotkeyWorker {
@@ -93,6 +94,7 @@ impl HotkeyWorker {
             thread_id: AtomicU32::new(0),
             stopping: AtomicBool::new(false),
             events: Mutex::new(events),
+            wake: Mutex::new(None),
         });
         let (started_tx, started_rx) = mpsc::channel::<u32>();
         let thread_shared = shared.clone();
@@ -131,6 +133,14 @@ impl HotkeyWorker {
 
     pub fn unregister_hotkey(&self, id: i32) {
         let _ = self.post_op(OpKind::Unregister { id }, true);
+    }
+
+    /// Installs a callback that runs on the worker thread whenever a hotkey
+    /// fires.  Frontends with an idle event loop use it to request a repaint.
+    pub fn set_wake_callback(&self, callback: Arc<dyn Fn() + Send + Sync>) {
+        if let Ok(mut wake) = self.shared.wake.lock() {
+            *wake = Some(callback);
+        }
     }
 
     fn stop(&self) {
@@ -180,6 +190,13 @@ fn worker_main(shared: Arc<WorkerShared>, started: Sender<u32>) {
                 log_hotkey(&format!("Worker WM_HOTKEY id={id}"));
                 if let Ok(tx) = shared.events.lock() {
                     let _ = tx.send(id);
+                }
+                // An idle UI event loop only polls after the next input event,
+                // so a global hotkey needs an explicit wake-up.
+                if let Ok(wake) = shared.wake.lock() {
+                    if let Some(wake) = wake.as_ref() {
+                        wake();
+                    }
                 }
             }
             WM_NULL => {
@@ -265,6 +282,12 @@ impl HotkeyManager {
             self.handle_hotkey(id);
         }
         std::mem::take(&mut self.pending_filter_ids)
+    }
+
+    /// Installs a callback that runs on the worker thread whenever a hotkey
+    /// fires.  Frontends with an idle event loop use it to request a repaint.
+    pub fn set_wake_callback(&self, callback: Arc<dyn Fn() + Send + Sync>) {
+        self.worker.set_wake_callback(callback);
     }
 
     pub fn register_hotkey(&mut self, filter_id: &str, key_sequence: Option<KeySequence>) -> bool {

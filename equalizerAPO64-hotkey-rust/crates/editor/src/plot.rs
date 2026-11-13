@@ -420,7 +420,11 @@ pub fn show_graphic_eq(ui: &mut egui::Ui, ed: &mut GraphicEqEditor) -> GraphicEq
     let height = ed.view_height.max(60.0);
     let nodes: Vec<FilterNode> = ed.nodes.iter().map(|n| FilterNode { freq: n.freq, db_gain: n.db_gain }).collect();
     let bands: Vec<f64> = GraphicEqEditor::bands(ed.band_count).to_vec();
-    let mut state = PlotState { zoom_x: ed.zoom_x, zoom_y: ed.zoom_y, scroll: ed.scroll };
+    let mut state = PlotState {
+        zoom_x: ed.zoom_x,
+        zoom_y: ed.zoom_y,
+        scroll: Vec2::new(ed.scroll.0, ed.scroll.1),
+    };
     let canvas = plot_frame(
         ui,
         &mut state,
@@ -431,7 +435,7 @@ pub fn show_graphic_eq(ui: &mut egui::Ui, ed: &mut GraphicEqEditor) -> GraphicEq
     );
     ed.zoom_x = state.zoom_x;
     ed.zoom_y = state.zoom_y;
-    ed.scroll = state.scroll;
+    ed.scroll = (state.scroll.x, state.scroll.y);
     let mut result = GraphicEqResult::default();
     let response = canvas.response.clone();
     let plot = canvas.plot_rect;

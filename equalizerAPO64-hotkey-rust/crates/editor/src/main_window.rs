@@ -14,6 +14,7 @@ use egui::{Color32, Vec2};
 use crate::analysis::{AnalysisRequest, AnalysisResult, AnalysisThread, DeviceSnapshot};
 use crate::filter_table::{self, file_title, FilterTab, TabUiReport, TableClipboard};
 use crate::guis::GuiServices;
+use crate::hotkey::RepaintContext;
 use crate::hotkey_dialog::HotkeyDialog;
 use crate::model::FilterContext;
 use crate::plot::{self, PlotState};
