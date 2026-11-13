@@ -347,23 +347,26 @@ fn reserved_hotkey(sequence: &KeySequence) -> bool {
 }
 
 unsafe fn accept_hotkey_dialog(hwnd: HWND) {
-    if let Some(state) =
-        (GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut HotkeyPromptState).as_mut()
-    {
-        if let Some(sequence) = state.sequence {
-            if reserved_hotkey(&sequence) {
-                let message = wide_z(&i18n::tr(
-                    "This key combination is reserved by Windows. Please choose another one.",
-                ));
-                let _ = MessageBoxW(
-                    Some(hwnd),
-                    PCWSTR(message.as_ptr()),
-                    w!("Equalizer APO"),
-                    MB_OK | MB_ICONWARNING,
-                );
-                return;
-            }
-        }
+    let pointer = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut HotkeyPromptState;
+    // Decide first, then show the warning without holding a mutable borrow:
+    // a message box runs a nested message loop that re-enters this procedure.
+    let reserved = pointer
+        .as_ref()
+        .and_then(|state| state.sequence)
+        .is_some_and(|sequence| reserved_hotkey(&sequence));
+    if reserved {
+        let message = wide_z(&i18n::tr(
+            "This key combination is reserved by Windows. Please choose another one.",
+        ));
+        let _ = MessageBoxW(
+            Some(hwnd),
+            PCWSTR(message.as_ptr()),
+            w!("Equalizer APO"),
+            MB_OK | MB_ICONWARNING,
+        );
+        return;
+    }
+    if let Some(state) = pointer.as_mut() {
         *state.result.borrow_mut() = Some(state.sequence);
     }
     // Re-enable the owner before destroying the modal window so Windows can

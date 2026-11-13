@@ -1,10 +1,88 @@
 //! Window and inline-edit window procedures for the native editor.
 
+use std::cell::{RefCell, RefMut};
+use std::collections::VecDeque;
+use std::ops::{Deref, DerefMut};
+
 use super::*;
 
-pub(crate) unsafe fn app(hwnd: HWND) -> Option<&'static mut App> {
-    let pointer = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut App;
-    pointer.as_mut()
+/// The window stores the editor state behind a `RefCell` so a nested message
+/// loop (message boxes, popup menus, the VST host window) can never create a
+/// second `&mut App` while a handler still holds the first one.
+type AppCell = RefCell<App>;
+
+thread_local! {
+    /// Messages that arrived while the state was borrowed.  They are posted
+    /// by the inline edit controls and must not be dropped, otherwise an edit
+    /// committed by a menu that opens inside another handler would be lost.
+    static DEFERRED_MESSAGES: RefCell<VecDeque<(isize, u32, WPARAM, LPARAM)>> =
+        const { RefCell::new(VecDeque::new()) };
+}
+
+pub(crate) struct AppRef(Option<RefMut<'static, App>>);
+
+impl AppRef {
+    fn new(borrow: RefMut<'static, App>) -> Self {
+        Self(Some(borrow))
+    }
+}
+
+impl Deref for AppRef {
+    type Target = App;
+
+    fn deref(&self) -> &App {
+        self.0.as_deref().expect("app borrow")
+    }
+}
+
+impl DerefMut for AppRef {
+    fn deref_mut(&mut self) -> &mut App {
+        self.0.as_deref_mut().expect("app borrow")
+    }
+}
+
+impl Drop for AppRef {
+    fn drop(&mut self) {
+        // Release the borrow before dispatching deferred messages: their
+        // handlers need to borrow the same state again.
+        self.0.take();
+        flush_deferred_messages();
+    }
+}
+
+unsafe fn app_cell(hwnd: HWND) -> Option<&'static AppCell> {
+    let pointer = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut AppCell;
+    pointer.as_ref()
+}
+
+pub(crate) unsafe fn app(hwnd: HWND) -> Option<AppRef> {
+    let cell = app_cell(hwnd)?;
+    cell.try_borrow_mut().ok().map(AppRef::new)
+}
+
+/// Messages that mutate the document from a control and therefore must be
+/// replayed after the current handler releases the state.  Timer ticks are
+/// not deferred: dropping one only delays the next poll.
+fn deferrable(msg: u32) -> bool {
+    matches!(
+        msg,
+        WM_APP_COMMIT_EDIT
+            | WM_APP_CANCEL_EDIT
+            | WM_APP_COMMIT_VALUE
+            | WM_APP_CANCEL_VALUE
+    )
+}
+
+fn flush_deferred_messages() {
+    loop {
+        let next = DEFERRED_MESSAGES.with(|queue| queue.borrow_mut().pop_front());
+        let Some((hwnd, msg, wparam, lparam)) = next else {
+            break;
+        };
+        unsafe {
+            SendMessageW(HWND(hwnd as *mut core::ffi::c_void), msg, Some(wparam), Some(lparam));
+        }
+    }
 }
 
 pub(crate) unsafe extern "system" fn value_edit_proc(
@@ -83,10 +161,25 @@ pub(crate) unsafe extern "system" fn main_window_proc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
+    // A nested message loop may deliver an edit-commit message while the
+    // handler that opened the loop still owns the state.  Replay it once the
+    // borrow is released instead of losing the edit.
+    if deferrable(msg) {
+        if let Some(cell) = app_cell(hwnd) {
+            if cell.try_borrow_mut().is_err() {
+                DEFERRED_MESSAGES.with(|queue| {
+                    queue
+                        .borrow_mut()
+                        .push_back((hwnd.0 as isize, msg, wparam, lparam));
+                });
+                return LRESULT(0);
+            }
+        }
+    }
     match msg {
         WM_CREATE => {
             let dpi = GetDpiForWindow(hwnd).max(96);
-            let state = Box::new(App::new(dpi));
+            let state = Box::new(RefCell::new(App::new(dpi)));
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
             if let Some(state) = app(hwnd) {
                 state.update_title(hwnd);
@@ -100,7 +193,7 @@ pub(crate) unsafe extern "system" fn main_window_proc(
             LRESULT(0)
         }
         WM_SIZE => {
-            if let Some(state) = app(hwnd) {
+            if let Some(mut state) = app(hwnd) {
                 state.commit_value_edit(hwnd, true);
                 state.update_scrollbar(hwnd);
             }
@@ -110,7 +203,7 @@ pub(crate) unsafe extern "system" fn main_window_proc(
         WM_PAINT => {
             let mut paint = PAINTSTRUCT::default();
             let hdc = BeginPaint(hwnd, &mut paint);
-            if let Some(state) = app(hwnd) {
+            if let Some(mut state) = app(hwnd) {
                 // Double-buffer the invalid region: GDI painting without a
                 // back buffer flickers heavily while hovering/dragging.
                 let rc = paint.rcPaint;
@@ -142,7 +235,7 @@ pub(crate) unsafe extern "system" fn main_window_proc(
         }
         WM_ERASEBKGND => LRESULT(1),
         WM_PRINTCLIENT => {
-            if let Some(state) = app(hwnd) {
+            if let Some(mut state) = app(hwnd) {
                 state.paint_offset = (0, 0);
                 state.paint(hwnd, HDC(wparam.0 as *mut core::ffi::c_void));
             }
@@ -157,7 +250,7 @@ pub(crate) unsafe extern "system" fn main_window_proc(
             DefWindowProcW(hwnd, msg, wparam, lparam)
         }
         WM_VSCROLL => {
-            if let Some(state) = app(hwnd) {
+            if let Some(mut state) = app(hwnd) {
                 state.commit_edit(hwnd, true);
                 state.commit_value_edit(hwnd, true);
                 state.on_vscroll(hwnd, wparam, lparam);
@@ -165,27 +258,27 @@ pub(crate) unsafe extern "system" fn main_window_proc(
             LRESULT(0)
         }
         WM_MOUSEWHEEL => {
-            if let Some(state) = app(hwnd) {
+            if let Some(mut state) = app(hwnd) {
                 state.commit_edit(hwnd, true);
                 state.on_wheel(hwnd, wparam, lparam);
             }
             LRESULT(0)
         }
         WM_KEYDOWN => {
-            if let Some(state) = app(hwnd) {
+            if let Some(mut state) = app(hwnd) {
                 state.on_key(hwnd, wparam);
             }
             LRESULT(0)
         }
         WM_LBUTTONDOWN => {
             let _ = SetFocus(Some(hwnd));
-            if let Some(state) = app(hwnd) {
+            if let Some(mut state) = app(hwnd) {
                 state.on_click(hwnd, lparam);
             }
             LRESULT(0)
         }
         WM_MOUSEMOVE => {
-            if let Some(state) = app(hwnd) {
+            if let Some(mut state) = app(hwnd) {
                 let mut track = TRACKMOUSEEVENT {
                     cbSize: size_of::<TRACKMOUSEEVENT>() as u32,
                     dwFlags: TME_LEAVE,
@@ -198,7 +291,7 @@ pub(crate) unsafe extern "system" fn main_window_proc(
             LRESULT(0)
         }
         WM_MOUSELEAVE => {
-            if let Some(state) = app(hwnd) {
+            if let Some(mut state) = app(hwnd) {
                 state.hover_pos = None;
                 if let Some(rect) = state.hot_rect.take() {
                     let _ = InvalidateRect(Some(hwnd), Some(&rect), false);
@@ -207,13 +300,13 @@ pub(crate) unsafe extern "system" fn main_window_proc(
             LRESULT(0)
         }
         WM_LBUTTONUP => {
-            if let Some(state) = app(hwnd) {
+            if let Some(mut state) = app(hwnd) {
                 state.on_mouse_up(hwnd);
             }
             LRESULT(0)
         }
         WM_LBUTTONDBLCLK => {
-            if let Some(state) = app(hwnd) {
+            if let Some(mut state) = app(hwnd) {
                 state.on_click(hwnd, lparam);
                 if let Some(index) = state.selected {
                     let x = (lparam.0 & 0xFFFF) as u16 as i16 as i32;
@@ -230,7 +323,7 @@ pub(crate) unsafe extern "system" fn main_window_proc(
         }
         WM_RBUTTONDOWN => {
             let _ = SetFocus(Some(hwnd));
-            if let Some(state) = app(hwnd) {
+            if let Some(mut state) = app(hwnd) {
                 let x = (lparam.0 & 0xFFFF) as u16 as i16 as i32;
                 let y = ((lparam.0 >> 16) & 0xFFFF) as u16 as i16 as i32;
                 if state.show_analysis && point_in(&state.plot_rect, x, y) {
@@ -243,7 +336,7 @@ pub(crate) unsafe extern "system" fn main_window_proc(
             LRESULT(0)
         }
         WM_RBUTTONUP => {
-            if let Some(state) = app(hwnd) {
+            if let Some(mut state) = app(hwnd) {
                 if state.plot_pan.take().is_some() {
                     let _ = ReleaseCapture();
                     state.invalidate_plot(hwnd);
@@ -252,25 +345,25 @@ pub(crate) unsafe extern "system" fn main_window_proc(
             LRESULT(0)
         }
         WM_APP_COMMIT_EDIT => {
-            if let Some(state) = app(hwnd) {
+            if let Some(mut state) = app(hwnd) {
                 state.commit_edit(hwnd, true);
             }
             LRESULT(0)
         }
         WM_APP_CANCEL_EDIT => {
-            if let Some(state) = app(hwnd) {
+            if let Some(mut state) = app(hwnd) {
                 state.commit_edit(hwnd, false);
             }
             LRESULT(0)
         }
         WM_APP_COMMIT_VALUE => {
-            if let Some(state) = app(hwnd) {
+            if let Some(mut state) = app(hwnd) {
                 state.commit_value_edit(hwnd, true);
             }
             LRESULT(0)
         }
         WM_APP_CANCEL_VALUE => {
-            if let Some(state) = app(hwnd) {
+            if let Some(mut state) = app(hwnd) {
                 state.commit_value_edit(hwnd, false);
             }
             LRESULT(0)
@@ -287,7 +380,7 @@ pub(crate) unsafe extern "system" fn main_window_proc(
                 suggested.bottom - suggested.top,
                 SWP_NOZORDER | SWP_NOACTIVATE,
             );
-            if let Some(state) = app(hwnd) {
+            if let Some(mut state) = app(hwnd) {
                 state.commit_value_edit(hwnd, true);
                 state.commit_edit(hwnd, true);
                 state.set_dpi(dpi);
@@ -306,7 +399,7 @@ pub(crate) unsafe extern "system" fn main_window_proc(
             {
                 if wparam.0 == TIMER_SCROLL_TEST {
                     let finished = app(hwnd)
-                        .map(|state| state.scroll_test_tick())
+                        .map(|mut state| state.scroll_test_tick())
                         .unwrap_or(true);
                     if finished {
                         let _ = KillTimer(Some(hwnd), TIMER_SCROLL_TEST);
@@ -322,7 +415,7 @@ pub(crate) unsafe extern "system" fn main_window_proc(
                 }
             }
             if wparam.0 == TIMER_ANALYSIS {
-                if let Some(state) = app(hwnd) {
+                if let Some(mut state) = app(hwnd) {
                     state.poll_analysis(hwnd);
                     let ids = state.hotkeys.poll();
                     for filter_id in ids {
@@ -335,7 +428,7 @@ pub(crate) unsafe extern "system" fn main_window_proc(
         }
         WM_COMMAND => {
             let id = wparam.0 & 0xFFFF;
-            if let Some(state) = app(hwnd) {
+            if let Some(mut state) = app(hwnd) {
                 match id {
                     ID_EXIT => {
                         let _ = PostMessageW(Some(hwnd), WM_CLOSE, WPARAM(0), LPARAM(0));
@@ -434,7 +527,7 @@ pub(crate) unsafe extern "system" fn main_window_proc(
         }
         WM_CLOSE => {
             let mut allow = true;
-            if let Some(state) = app(hwnd) {
+            if let Some(mut state) = app(hwnd) {
                 allow = state.confirm_close(hwnd);
                 if !allow {
                     // A pending reset/restart must not fire after the user
@@ -443,7 +536,7 @@ pub(crate) unsafe extern "system" fn main_window_proc(
                 }
             }
             if allow {
-                if let Some(state) = app(hwnd) {
+                if let Some(mut state) = app(hwnd) {
                     if !state.skip_save_preferences {
                         state.save_preferences(hwnd);
                     }
@@ -464,7 +557,7 @@ pub(crate) unsafe extern "system" fn main_window_proc(
             LRESULT(0)
         }
         WM_NCDESTROY => {
-            let pointer = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut App;
+            let pointer = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut AppCell;
             if !pointer.is_null() {
                 drop(Box::from_raw(pointer));
                 let _ = SetWindowLongPtrW(hwnd, GWLP_USERDATA, 0);
