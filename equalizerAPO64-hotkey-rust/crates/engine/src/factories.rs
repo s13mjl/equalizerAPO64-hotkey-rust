@@ -3,6 +3,10 @@
 //! Dispatch order is identical to `FilterEngine::loadConfigFile`:
 //! Device, If, Expression/inline, Include, Stage, Channel, IIR, BiQuad,
 //! Preamp, Delay, Copy, Convolution, GraphicEQ, VSTPlugin, LoudnessCorrection.
+//!
+//! This build is trimmed to the preamp: `dispatch_line` drops every other
+//! filter command before it reaches a factory.  The structural directives are
+//! kept because they decide which preamp lines apply.
 
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
@@ -165,12 +169,33 @@ const FACTORIES: [FactoryFn; 15] = [
     loudness_correction_factory,
 ];
 
+/// Commands this build still executes.  Everything else is a filter that the
+/// trimmed engine must not load; the preamp is the only one left.
+fn accepts_command(command: &str) -> bool {
+    matches!(
+        command,
+        "Preamp"
+            | "Device"
+            | "If"
+            | "ElseIf"
+            | "Else"
+            | "EndIf"
+            | "Eval"
+            | "Include"
+            | "Stage"
+            | "Channel"
+    )
+}
+
 pub(crate) fn dispatch_line(
     loader: &mut Loader,
     config_path: &str,
     command: &str,
     parameters: &str,
 ) {
+    if !accepts_command(command) {
+        return;
+    }
     let mut command = command.to_string();
     let mut parameters = parameters.to_string();
     for factory in FACTORIES {

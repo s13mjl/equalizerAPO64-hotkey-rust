@@ -1171,21 +1171,17 @@ mod tests {
     }
 
     #[test]
-    fn parses_all_basic_filters_and_if() {
+    fn drops_every_filter_but_the_preamp() {
         let path = temp_config(
             "basic",
             "Preamp: -6 dB\n\
              Filter: ON PK Fc 1000 Hz Gain 5 dB Q 1\n\
              GraphicEQ: 20 0; 1000 3\n\
-             If: sampleRate == 48000\n\
-             Delay: 10 ms\n\
-             Else:\n\
-             Delay: 20 ms\n\
-             EndIf:\n",
+             Delay: 10 ms\n",
         );
         let mut loader = test_loader();
         loader.load_config_file(path.to_str().unwrap());
-        assert_eq!(loader.filter_infos.len(), 4);
+        assert_eq!(loader.filter_infos.len(), 1);
         assert_eq!(loader.filter_infos[0].in_channels, vec![0, 1]);
     }
 
@@ -1215,7 +1211,8 @@ mod tests {
         );
         let mut loader = test_loader();
         loader.load_config_file(path.to_str().unwrap());
-        assert_eq!(loader.filter_infos.len(), 2);
+        // The biquad is dropped, the preamp with the evaluated gain stays.
+        assert_eq!(loader.filter_infos.len(), 1);
     }
 
     #[test]
@@ -1246,7 +1243,9 @@ mod tests {
         );
         let mut loader = test_loader();
         loader.load_config_file(path.to_str().unwrap());
-        assert_eq!(loader.filter_infos.len(), 2);
+        // Only the preamp for the matching device survives; the delays are
+        // dropped by the trimmed build either way.
+        assert_eq!(loader.filter_infos.len(), 1);
     }
 
     #[test]
@@ -1290,11 +1289,11 @@ mod tests {
             "Stage: pre-mix\n\
              Preamp: -9 dB\n\
              Stage: post-mix\n\
-             Delay: 3 ms\n",
+             Preamp: -3 dB\n",
         );
         let mut loader = test_loader();
         loader.load_config_file(path.to_str().unwrap());
-        // Engine is in post-mix stage, so only the Delay is active.
+        // Engine is in post-mix stage, so only the post-mix preamp is active.
         assert_eq!(loader.filter_infos.len(), 1);
     }
 }
