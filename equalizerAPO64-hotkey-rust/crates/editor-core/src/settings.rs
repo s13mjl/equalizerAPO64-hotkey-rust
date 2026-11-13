@@ -571,4 +571,41 @@ mod tests {
         assert_eq!(r[0], "5.txt");
         assert_eq!(r.len(), 10);
     }
+
+    #[test]
+    fn hotkey_bindings_survive_structural_edits() {
+        let preamp = "Preamp: -6 dB";
+        let peak = "Filter: ON PK Fc 100 Hz Gain 3 dB Q 1";
+        let shelf = "Filter: ON LS Fc 200 Hz Gain 2 dB";
+        let before = hotkey_keys(&[
+            preamp.to_string(),
+            peak.to_string(),
+            shelf.to_string(),
+        ]);
+        let peak_key = before[1].clone();
+
+        // Inserting a row in front must not move the binding of the filters
+        // behind it.
+        let inserted = hotkey_keys(&[
+            "Filter: ON HP Fc 30 Hz".to_string(),
+            preamp.to_string(),
+            peak.to_string(),
+            shelf.to_string(),
+        ]);
+        assert_eq!(inserted[2], peak_key);
+
+        // Deleting an unrelated row keeps the same identity as well.
+        let deleted = hotkey_keys(&[peak.to_string(), shelf.to_string()]);
+        assert_eq!(deleted[0], peak_key);
+    }
+
+    #[test]
+    fn duplicate_rows_get_distinct_binding_keys() {
+        let line = "Filter: ON PK Fc 100 Hz Gain 3 dB Q 1";
+        let keys = hotkey_keys(&[line.to_string(), line.to_string()]);
+        assert_ne!(keys[0], keys[1]);
+        // The occurrence suffix shifts when the first duplicate is deleted.
+        let remaining = hotkey_keys(&[line.to_string()]);
+        assert_eq!(remaining[0], keys[0]);
+    }
 }
