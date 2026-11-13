@@ -106,7 +106,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     CREATESTRUCTW, DefWindowProcW, DeleteMenu, DestroyMenu, DestroyWindow, DispatchMessageW, DrawMenuBar,
     GetClientRect,
     GetMenu, GetMessageW, GetParent, GetSubMenu, GetWindowLongPtrW,
-    GetWindowRect, GetWindowTextLengthW, GetWindowTextW, IsDialogMessageW, IsIconic, IsWindow, IsZoomed, KillTimer, LoadCursorW,
+    GetWindowRect, GetWindowTextLengthW, GetWindowTextW, IsDialogMessageW, IsIconic, IsWindow, IsZoomed, LoadCursorW,
     MessageBoxW, PostMessageW, PostQuitMessage, RegisterClassW, SendMessageW, SetTimer,
     SetWindowLongPtrW, SetWindowPos, SetWindowTextW, SetForegroundWindow, ShowWindow,
     TrackPopupMenuEx, TranslateMessage, CS_DBLCLKS, CS_HREDRAW, CS_VREDRAW, CW_USEDEFAULT, ES_AUTOHSCROLL,
@@ -127,6 +127,9 @@ use windows::Win32::UI::WindowsAndMessaging::{
     WS_CAPTION, WS_CHILD, WS_OVERLAPPEDWINDOW, WS_POPUP, WS_SYSMENU, WS_VISIBLE, WS_VSCROLL,
     SB_ENDSCROLL,
 };
+
+#[cfg(debug_assertions)]
+use windows::Win32::UI::WindowsAndMessaging::KillTimer;
 
 #[cfg(debug_assertions)]
 const ROWS: usize = 10_000;
