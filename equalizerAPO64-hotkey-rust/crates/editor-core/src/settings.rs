@@ -262,7 +262,11 @@ pub fn save_row_preferences(config_path: &str, items: &[FilterItem]) {
     }
     let key = file_pref_key(config_path);
     let _ = eapo_common::registry_helper::create_key(&key);
-    let _ = eapo_common::registry_helper::write_multi_value(&key, "rowPrefs", &lines);
+    if let Err(error) = eapo_common::registry_helper::write_multi_value(&key, "rowPrefs", &lines) {
+        eapo_common::log_helper::log_error_static(&format!(
+            "Could not save row preferences for {config_path}: {error}"
+        ));
+    }
 }
 
 /// Stable fingerprint of a filter row, used to keep hotkeys attached to the
@@ -348,7 +352,13 @@ pub fn save_hotkey_bindings(
         .map(|(binding, sequence)| format!("{binding}|{}", sequence.to_string_qt()))
         .collect();
     let _ = eapo_common::registry_helper::create_key(&key);
-    let _ = eapo_common::registry_helper::write_multi_value(&key, "hotkeyBindings", &lines);
+    if let Err(error) =
+        eapo_common::registry_helper::write_multi_value(&key, "hotkeyBindings", &lines)
+    {
+        eapo_common::log_helper::log_error_static(&format!(
+            "Could not save hotkey bindings for {config_path}: {error}"
+        ));
+    }
 }
 
 pub fn load_row_hotkeys(
@@ -423,7 +433,11 @@ pub fn save_row_state(
         lines.push(format!("{index}:{command}:{json}"));
     }
     let _ = eapo_common::registry_helper::create_key(&key);
-    let _ = eapo_common::registry_helper::write_multi_value(&key, "rowPrefs", &lines);
+    if let Err(error) = eapo_common::registry_helper::write_multi_value(&key, "rowPrefs", &lines) {
+        eapo_common::log_helper::log_error_static(&format!(
+            "Could not save row preferences for {config_path}: {error}"
+        ));
+    }
 }
 
 /// Merges hotkey assignments into the per-file `rowPrefs` values, preserving
@@ -481,7 +495,11 @@ pub fn save_row_hotkeys(
         lines.push(format!("{index}:{command}:{json}"));
     }
     let _ = eapo_common::registry_helper::create_key(&key);
-    let _ = eapo_common::registry_helper::write_multi_value(&key, "rowPrefs", &lines);
+    if let Err(error) = eapo_common::registry_helper::write_multi_value(&key, "rowPrefs", &lines) {
+        eapo_common::log_helper::log_error_static(&format!(
+            "Could not save row preferences for {config_path}: {error}"
+        ));
+    }
 }
 
 pub fn load_scroll_offsets(config_path: &str) -> (i32, i32) {    if config_path.is_empty() {
