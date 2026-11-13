@@ -422,6 +422,12 @@ pub(crate) unsafe extern "system" fn main_window_proc(
                         state.handle_hotkey(hwnd, &filter_id);
                     }
                     state.poll_volume(hwnd);
+                    if state
+                        .autosave_due
+                        .is_some_and(|due| std::time::Instant::now() >= due)
+                    {
+                        state.flush_autosave(hwnd);
+                    }
                 }
             }
             LRESULT(0)

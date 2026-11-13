@@ -559,6 +559,9 @@ struct App {
     skip_save_preferences: bool,
     restart_after_close: bool,
     instant_mode: bool,
+    /// Instant-mode writes are debounced; dragging a slider must not rewrite
+    /// the configuration dozens of times per second.
+    autosave_due: Option<std::time::Instant>,
     recent_files: Vec<String>,
     analysis_resolution: i32,
     analysis_effective_resolution: i32,
@@ -699,6 +702,7 @@ impl App {
             skip_save_preferences: false,
             restart_after_close: false,
             instant_mode,
+            autosave_due: None,
             recent_files,
             analysis_resolution,
             analysis_effective_resolution: analysis_resolution,

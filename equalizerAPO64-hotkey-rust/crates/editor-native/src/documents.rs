@@ -79,6 +79,7 @@ impl App {
         }
         self.commit_value_edit(hwnd, true);
         self.commit_edit(hwnd, true);
+        self.flush_autosave(hwnd);
         self.capture_active_tab();
         self.load_tab(hwnd, index);
     }
@@ -86,6 +87,7 @@ impl App {
     pub(super) unsafe fn new_tab(&mut self, hwnd: HWND) {
         self.commit_value_edit(hwnd, true);
         self.commit_edit(hwnd, true);
+        self.flush_autosave(hwnd);
         self.capture_active_tab();
         let index = self.tabs.len();
         self.tabs.push(TabInfo {
@@ -105,6 +107,7 @@ impl App {
         if paths.is_empty() {
             return;
         }
+        self.flush_autosave(hwnd);
         self.commit_value_edit(hwnd, true);
         self.commit_edit(hwnd, true);
         self.capture_active_tab();
@@ -259,6 +262,7 @@ impl App {
     }
 
     pub(super) unsafe fn save(&mut self, hwnd: HWND) -> bool {
+        self.autosave_due = None;
         if self.doc_path.is_none() {
             return self.save_as(hwnd);
         }
@@ -291,17 +295,31 @@ impl App {
         }
     }
 
-    pub(super) unsafe fn autosave(&mut self, hwnd: HWND) {
+    pub(super) unsafe fn autosave(&mut self, _hwnd: HWND) {
         if self.instant_mode && self.doc_path.is_some() {
+            // Debounce: a slider drag produces dozens of edits per second and
+            // every write can block while the engine has the file open.
+            self.autosave_due = Some(
+                std::time::Instant::now() + std::time::Duration::from_millis(300),
+            );
+        }
+    }
+
+    /// Writes a pending instant-mode change before the document changes
+    /// underneath it (tab switch, open, close).
+    pub(super) unsafe fn flush_autosave(&mut self, hwnd: HWND) {
+        if self.autosave_due.take().is_some() && self.instant_mode && self.doc_path.is_some() {
             self.save(hwnd);
         }
     }
+
     /// Asks for every dirty tab before the window closes.  Saving a tab that is
     /// not in front requires loading it, so the original tab is restored when
     /// the user cancels.
     pub(super) unsafe fn confirm_close(&mut self, hwnd: HWND) -> bool {
         self.commit_value_edit(hwnd, true);
         self.commit_edit(hwnd, true);
+        self.flush_autosave(hwnd);
         self.capture_active_tab();
         let original = self.active_tab;
         for index in 0..self.tabs.len() {
@@ -342,6 +360,7 @@ impl App {
         }
         self.commit_value_edit(hwnd, true);
         self.commit_edit(hwnd, true);
+        self.flush_autosave(hwnd);
         self.capture_active_tab();
         if self.tabs[index].dirty {
             let title = wide_z(&i18n::tr_arg(
