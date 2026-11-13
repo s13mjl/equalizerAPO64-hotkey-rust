@@ -59,8 +59,10 @@ fn wide_z(text: &str) -> Vec<u16> {
     text.encode_utf16().chain(std::iter::once(0)).collect()
 }
 
-unsafe fn state_of(hwnd: HWND) -> Option<&'static mut CalState> {
-    (GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut CalState).as_mut()
+unsafe fn state_of(hwnd: HWND) -> Option<std::cell::RefMut<'static, CalState>> {
+    let cell =
+        (GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut RefCell<CalState>).as_ref()?;
+    cell.try_borrow_mut().ok()
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -317,11 +319,12 @@ unsafe extern "system" fn cal_proc(
         WM_CREATE => {
             let create = &*(lparam.0 as *const CREATESTRUCTW);
             let state = Box::from_raw(create.lpCreateParams as *mut CalState);
+            let state = Box::new(RefCell::new(*state));
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
-            let Some(state) = state_of(hwnd) else {
+            let Some(mut state) = state_of(hwnd) else {
                 return LRESULT(-1);
             };
-            build_controls(hwnd, state);
+            build_controls(hwnd, &mut state);
             LRESULT(0)
         }
         WM_COMMAND => {
@@ -354,7 +357,7 @@ unsafe extern "system" fn cal_proc(
                         calibration::play(calibration::selected_channel());
                     }
                     if let Some(state) = state_of(hwnd) {
-                        set_playing_text(state);
+                        set_playing_text(&state);
                     }
                 }
                 _ => {}
@@ -369,8 +372,8 @@ unsafe extern "system" fn cal_proc(
         }
         WM_NCDESTROY => {
             calibration::stop();
-            let pointer = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut CalState;
-            if let Some(state) = pointer.as_mut() {
+            let pointer = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut RefCell<CalState>;
+            if let Some(state) = pointer.as_ref().and_then(|cell| cell.try_borrow().ok()) {
                 if !state.font.is_invalid() {
                     let _ = DeleteObject(HGDIOBJ(state.font.0));
                 }

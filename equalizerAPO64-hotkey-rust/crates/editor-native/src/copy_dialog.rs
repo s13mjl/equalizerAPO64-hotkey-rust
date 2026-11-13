@@ -117,8 +117,10 @@ fn mode_of(summand: &Summand) -> usize {
     }
 }
 
-unsafe fn state_of(hwnd: HWND) -> Option<&'static mut CopyState> {
-    (GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut CopyState).as_mut()
+unsafe fn state_of(hwnd: HWND) -> Option<std::cell::RefMut<'static, CopyState>> {
+    let cell =
+        (GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut RefCell<CopyState>).as_ref()?;
+    cell.try_borrow_mut().ok()
 }
 
 unsafe fn get_text(hwnd: HWND) -> String {
@@ -527,11 +529,11 @@ unsafe fn build_rows(dialog: HWND, state: &mut CopyState) {
 }
 
 unsafe fn rebuild(dialog: HWND) {
-    let Some(state) = state_of(dialog) else {
+    let Some(mut state) = state_of(dialog) else {
         return;
     };
     if state.tab == 1 && !state.rows.is_empty() {
-        collect(state);
+        collect(&mut state);
     }
     destroy_children(dialog);
     state.rows.clear();
@@ -626,18 +628,18 @@ unsafe fn rebuild(dialog: HWND) {
     .unwrap_or_default();
     if state.tab == 1 {
         let _ = ShowWindow(state.add_assignment, SW_SHOW);
-        build_rows(dialog, state);
+        build_rows(dialog, &mut state);
     } else {
         let _ = ShowWindow(state.add_assignment, SW_HIDE);
         state.content_height = 0;
         state.scroll = 0;
     }
-    layout_rows(dialog, state);
+    layout_rows(dialog, &mut state);
     let _ = InvalidateRect(Some(dialog), None, true);
 }
 
 unsafe fn scroll_by(dialog: HWND, delta: i32) {
-    let Some(state) = state_of(dialog) else {
+    let Some(mut state) = state_of(dialog) else {
         return;
     };
     let max_scroll = (state.content_height - state.visible_height).max(0);
@@ -646,7 +648,7 @@ unsafe fn scroll_by(dialog: HWND, delta: i32) {
         return;
     }
     state.scroll = next;
-    layout_rows(dialog, state);
+    layout_rows(dialog, &mut state);
     let _ = InvalidateRect(Some(dialog), None, true);
 }
 
@@ -820,6 +822,7 @@ unsafe extern "system" fn copy_proc(
         WM_CREATE => {
             let create = &*(lparam.0 as *const CREATESTRUCTW);
             let state = Box::from_raw(create.lpCreateParams as *mut CopyState);
+            let state = Box::new(RefCell::new(*state));
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
             LRESULT(0)
         }
@@ -828,9 +831,9 @@ unsafe extern "system" fn copy_proc(
             let code = ((wparam.0 >> 16) & 0xFFFF) as u32;
             match id {
                 ID_OK => {
-                    if let Some(state) = state_of(hwnd) {
+                    if let Some(mut state) = state_of(hwnd) {
                         if state.tab == 1 {
-                            collect(state);
+                            collect(&mut state);
                         }
                         *state.result.borrow_mut() = Some(state.working.clone());
                     }
@@ -842,13 +845,13 @@ unsafe extern "system" fn copy_proc(
                     let _ = DestroyWindow(hwnd);
                 }
                 ID_TAB_GRAPH | ID_TAB_ASSIGN => {
-                    if let Some(state) = state_of(hwnd) {
+                    if let Some(mut state) = state_of(hwnd) {
                         // Read the visible editors into `working` before the
                         // tab switch destroys them, otherwise edits made on
                         // the Assignments tab are lost (and the graph shows
                         // stale values).
                         if state.tab == 1 && !state.rows.is_empty() {
-                            collect(state);
+                            collect(&mut state);
                         }
                         state.tab = if id == ID_TAB_GRAPH { 0 } else { 1 };
                         state.scroll = 0;
@@ -856,8 +859,8 @@ unsafe extern "system" fn copy_proc(
                     }
                 }
                 ID_ADD_ASSIGNMENT => {
-                    if let Some(state) = state_of(hwnd) {
-                        collect(state);
+                    if let Some(mut state) = state_of(hwnd) {
+                        collect(&mut state);
                         state.working.push(Assignment {
                             target: String::new(),
                             summands: vec![Summand {
@@ -872,14 +875,14 @@ unsafe extern "system" fn copy_proc(
                 _ => {
                     if code == 1 {
                         if let Some(state) = state_of(hwnd) {
-                            update_modes(state);
+                            update_modes(&state);
                         }
                     } else if code == 0 && (ID_ROW_BASE..ID_MODE_BASE).contains(&id) {
-                        if let Some(state) = state_of(hwnd) {
+                        if let Some(mut state) = state_of(hwnd) {
                             let index = id - ID_ROW_BASE;
                             let row = index / 2;
                             let remove = index % 2 == 1;
-                            collect(state);
+                            collect(&mut state);
                             if let Some(control) = state.rows.get(row) {
                                 let assignment = control.assignment;
                                 let summand = control.summand;
@@ -937,7 +940,7 @@ unsafe extern "system" fn copy_proc(
             let hdc = BeginPaint(hwnd, &mut paint);
             if let Some(state) = state_of(hwnd) {
                 if state.tab == 0 {
-                    paint_graph(hwnd, hdc, state);
+                    paint_graph(hwnd, hdc, &state);
                 }
             }
             let _ = EndPaint(hwnd, &paint);
@@ -946,17 +949,17 @@ unsafe extern "system" fn copy_proc(
         WM_PRINTCLIENT => {
             if let Some(state) = state_of(hwnd) {
                 if state.tab == 0 {
-                    paint_graph(hwnd, HDC(wparam.0 as *mut core::ffi::c_void), state);
+                    paint_graph(hwnd, HDC(wparam.0 as *mut core::ffi::c_void), &state);
                 }
             }
             LRESULT(0)
         }
         WM_SIZE => {
-            if let Some(state) = state_of(hwnd) {
+            if let Some(mut state) = state_of(hwnd) {
                 let mut client = RECT::default();
                 let _ = GetClientRect(hwnd, &mut client);
                 state.content_bottom = client.bottom - scale(56, state.dpi);
-                layout_rows(hwnd, state);
+                layout_rows(hwnd, &mut state);
                 let _ = InvalidateRect(Some(hwnd), None, true);
             }
             LRESULT(0)
@@ -967,8 +970,8 @@ unsafe extern "system" fn copy_proc(
             LRESULT(0)
         }
         WM_NCDESTROY => {
-            let pointer = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut CopyState;
-            if let Some(state) = pointer.as_mut() {
+            let pointer = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut RefCell<CopyState>;
+            if let Some(state) = pointer.as_ref().and_then(|cell| cell.try_borrow().ok()) {
                 for font in [state.font, state.small] {
                     if !font.is_invalid() {
                         let _ = DeleteObject(HGDIOBJ(font.0));
