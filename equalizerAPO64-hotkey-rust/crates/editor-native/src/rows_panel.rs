@@ -196,13 +196,20 @@ impl App {
                                 painted = true;
                             }
                             FilterEditor::GraphicEq(graphic) => {
+                                // Reserve the right-hand column for the hotkey
+                                // label so the node table cannot paint over it.
+                                let width = if row.hotkey.is_some() {
+                                    client.right - scale(158, self.dpi)
+                                } else {
+                                    client.right
+                                };
                                 paint_graphic_eq_row(
                                     hdc,
                                     self.paint_offset,
                                     self.dpi,
                                     y,
                                     height,
-                                    client.right,
+                                    width,
                                     graphic,
                                     row.geq_table_top,
                                     row.enabled,
@@ -239,7 +246,7 @@ impl App {
                         hdc,
                         client.right - scale(170, self.dpi),
                         y + scale(5, self.dpi),
-                        &wide(&hotkey.to_string_qt()),
+                        &wide(&fit_text(&hotkey.to_string_qt(), 160)),
                         palette::muted(),
                     );
                 }
