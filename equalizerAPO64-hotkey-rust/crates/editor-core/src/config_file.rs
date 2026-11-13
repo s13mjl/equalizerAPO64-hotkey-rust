@@ -106,4 +106,32 @@ mod tests {
         assert_eq!(loaded, vec!["Preamp: 0 dB".to_string()]);
         let _ = std::fs::remove_file(&path);
     }
+
+    #[test]
+    fn save_replaces_existing_file_without_leaving_temps() {
+        let dir = std::env::temp_dir().join(format!(
+            "eapo_config_atomic_test_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("config.txt");
+        std::fs::write(&path, b"Preamp: -3 dB").unwrap();
+
+        save_config_file(
+            path.to_string_lossy().as_ref(),
+            &["Preamp: 1 dB".to_string()],
+        )
+        .unwrap();
+        assert_eq!(std::fs::read(&path).unwrap(), b"Preamp: 1 dB");
+
+        let leftovers: Vec<String> = std::fs::read_dir(&dir)
+            .unwrap()
+            .filter_map(|entry| entry.ok())
+            .map(|entry| entry.file_name().to_string_lossy().into_owned())
+            .filter(|name| name.ends_with(".tmp"))
+            .collect();
+        assert!(leftovers.is_empty(), "temporary files left behind: {leftovers:?}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }
