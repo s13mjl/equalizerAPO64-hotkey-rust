@@ -98,7 +98,7 @@ unsafe extern "system" fn prompt_wndproc(
             let hdc = BeginPaint(hwnd, &mut paint);
             let mut client = RECT::default();
             let _ = GetClientRect(hwnd, &mut client);
-            fill(hdc, 0, 0, client.right, client.bottom, WHITE);
+            fill(hdc, 0, 0, client.right, client.bottom, palette::white());
             let state = (GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut PromptState).as_mut();
             let dpi = state.as_ref().map(|state| state.dpi).unwrap_or(96);
             if let Some(state) = state.as_ref() {
@@ -109,14 +109,14 @@ unsafe extern "system" fn prompt_wndproc(
                 scale(12, dpi),
                 scale(12, dpi),
                 &wide(state.as_ref().map(|state| state.hint.as_str()).unwrap_or("")),
-                TEXT,
+                palette::text(),
             );
             draw_text(
                 hdc,
                 scale(12, dpi),
                 client.bottom - scale(22, dpi),
                 &trw("Enter = OK, Esc = Cancel"),
-                MUTED,
+                palette::muted(),
             );
             let _ = EndPaint(hwnd, &paint);
             LRESULT(0)
@@ -451,7 +451,7 @@ unsafe extern "system" fn hotkey_prompt_wndproc(
             let hdc = BeginPaint(hwnd, &mut paint);
             let mut client = RECT::default();
             let _ = GetClientRect(hwnd, &mut client);
-            fill(hdc, 0, 0, client.right, client.bottom, WHITE);
+            fill(hdc, 0, 0, client.right, client.bottom, palette::white());
             let state =
                 (GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut HotkeyPromptState).as_mut();
             let dpi = state.as_ref().map(|state| state.dpi).unwrap_or(96);
@@ -463,7 +463,7 @@ unsafe extern "system" fn hotkey_prompt_wndproc(
                 scale(12, dpi),
                 scale(12, dpi),
                 &trw("Press the desired key combination (Enter = OK, Esc = Cancel):"),
-                TEXT,
+                palette::text(),
             );
             let _ = EndPaint(hwnd, &paint);
             LRESULT(0)

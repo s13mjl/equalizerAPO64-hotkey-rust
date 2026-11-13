@@ -36,10 +36,11 @@ impl App {
             let row = &self.rows[index];
             let height = row.height as i32;
             if y + height > chrome {
-                let background = if self.selection.contains(&index) {
-                    SELECTED
+                let selected = self.selection.contains(&index);
+                let background = if selected && !palette::high_contrast() {
+                    palette::selected()
                 } else {
-                    WHITE
+                    palette::white()
                 };
                 fill(
                     hdc,
@@ -49,6 +50,28 @@ impl App {
                     (y + height).min(client.bottom),
                     background,
                 );
+                if selected && palette::high_contrast() {
+                    // High-contrast themes pair their highlight colour with a
+                    // different text colour than the one used by these
+                    // self-drawn rows, so mark the row with a border instead
+                    // of a filled background.
+                    fill(
+                        hdc,
+                        0,
+                        y.max(chrome),
+                        client.right,
+                        (y.max(chrome) + 1).min(client.bottom),
+                        palette::selected(),
+                    );
+                    fill(
+                        hdc,
+                        0,
+                        (y + height - 1).max(chrome),
+                        client.right,
+                        (y + height).min(client.bottom),
+                        palette::selected(),
+                    );
+                }
 
                 let mut number = [0u16; 24];
                 let number_len = format_row_number(&mut number, index);
@@ -58,7 +81,7 @@ impl App {
                     scale(6, self.dpi),
                     y + scale(5, self.dpi),
                     &number[..number_len],
-                    MUTED,
+                    palette::muted(),
                 );
                 SelectObject(hdc, HGDIOBJ(self.body.0));
 
@@ -72,9 +95,9 @@ impl App {
                     bottom: box_y + box_size,
                 };
                 let box_bg = if self.is_hot_rect(&box_rect) {
-                    HOVER
+                    palette::hover()
                 } else {
-                    WHITE
+                    palette::white()
                 };
                 fill(hdc, box_x, box_y, box_x + box_size, box_y + box_size, box_bg);
                 self.frame(hdc, box_x, box_y, box_x + box_size, box_y + box_size);
@@ -86,7 +109,7 @@ impl App {
                         box_y + inset,
                         box_x + box_size - inset,
                         box_y + box_size - inset,
-                        BAR,
+                        palette::bar(),
                     );
                 }
 
@@ -207,7 +230,7 @@ impl App {
                         scale(42, self.dpi),
                         y + scale(4, self.dpi),
                         &text[..text_len],
-                        if row.enabled { TEXT } else { MUTED },
+                        if row.enabled { palette::text() } else { palette::muted() },
                     );
                 }
                 if let Some(hotkey) = row.hotkey.as_ref() {
@@ -217,7 +240,7 @@ impl App {
                         client.right - scale(170, self.dpi),
                         y + scale(5, self.dpi),
                         &wide(&hotkey.to_string_qt()),
-                        MUTED,
+                        palette::muted(),
                     );
                 }
 
@@ -227,7 +250,7 @@ impl App {
                     (y + height - 1).max(chrome),
                     client.right,
                     (y + height).min(client.bottom),
-                    BORDER,
+                    palette::border(),
                 );
             }
             y += height;
@@ -238,7 +261,7 @@ impl App {
                 let drop = drop.min(self.rows.len());
                 let line_y = (chrome + self.prefix[drop] as i32 - self.offset)
                     .clamp(chrome, client.bottom.saturating_sub(1));
-                fill(hdc, 0, line_y, client.right, line_y + 2, CURVE_POS);
+                fill(hdc, 0, line_y, client.right, line_y + 2, palette::curve_pos());
             }
         }
         let _ = RestoreDC(hdc, saved);

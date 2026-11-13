@@ -20,6 +20,7 @@ mod input;
 mod layout;
 mod menus;
 mod paint_core;
+mod palette;
 mod prompt;
 mod rows_edit;
 mod rows_model;
@@ -117,6 +118,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     WM_ERASEBKGND, WM_KEYDOWN, WM_KILLFOCUS, WM_LBUTTONDBLCLK, WM_LBUTTONDOWN, WM_LBUTTONUP,
     WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_NCDESTROY, WM_PAINT, WM_PRINTCLIENT, WM_RBUTTONDOWN, WM_SETFONT,
     WM_SIZE, WM_SYSCHAR, WM_SYSKEYDOWN, WM_SYSCOMMAND,
+    WM_SETTINGCHANGE, WM_THEMECHANGED,
     WM_TIMER, WM_VSCROLL, WM_RBUTTONUP, WNDCLASSW, WNDPROC, WINDOW_EX_STYLE,
     WINDOW_STYLE, WS_BORDER, WS_CLIPCHILDREN, WS_TABSTOP,
     WS_CAPTION, WS_CHILD, WS_OVERLAPPEDWINDOW, WS_POPUP, WS_SYSMENU, WS_VISIBLE, WS_VSCROLL,
@@ -231,22 +233,6 @@ fn scroll_test_enabled() -> bool {
     false
 }
 
-const WHITE: COLORREF = COLORREF(0x00FF_FFFF);
-const TABLE_BG: COLORREF = COLORREF(0x00FA_FAFA);
-const CHROME_BG: COLORREF = COLORREF(0x00EE_EEEE);
-const BORDER: COLORREF = COLORREF(0x00C8_C8C8);
-const TEXT: COLORREF = COLORREF(0x0020_2020);
-const MUTED: COLORREF = COLORREF(0x0070_7070);
-const SELECTED: COLORREF = COLORREF(0x00FF_E8D8);
-const BAR: COLORREF = COLORREF(0x00C0_8040);
-const PLOT_BG: COLORREF = COLORREF(0x00FF_FFFF);
-const GRID: COLORREF = COLORREF(0x00E0_E0E0);
-const CURVE: COLORREF = COLORREF(0x0080_3030);
-const CURVE_POS: COLORREF = COLORREF(0x0020_20C0);
-const FILL_POS: COLORREF = COLORREF(0x00E8_E8FF);
-const WARNING: COLORREF = COLORREF(0x0000_80FF);
-/// Background of a clickable control under the mouse cursor.
-const HOVER: COLORREF = COLORREF(0x00F5_E9D8);
 
 fn wide_z(text: &str) -> Vec<u16> {
     let mut units: Vec<u16> = text.encode_utf16().collect();
@@ -945,7 +931,7 @@ impl App {
         SetBkMode(hdc, TRANSPARENT);
         let chrome = self.chrome_height();
 
-        fill(hdc, 0, 0, client.right, client.bottom, TABLE_BG);
+        fill(hdc, 0, 0, client.right, client.bottom, palette::table_bg());
         let table_bottom = client.bottom - self.analysis_height();
         self.paint_chrome(hdc, client.right, chrome);
         let mut table_client = client;
@@ -965,6 +951,7 @@ impl Drop for App {
 }
 
 fn main() -> windows::core::Result<()> {
+    palette::refresh();
     let args: Vec<String> = std::env::args().skip(1).collect();
     #[cfg(debug_assertions)]
     {

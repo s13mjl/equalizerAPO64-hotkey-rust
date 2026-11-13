@@ -296,6 +296,11 @@ pub(crate) unsafe extern "system" fn main_window_proc(
             let _ = InvalidateRect(Some(hwnd), None, false);
             LRESULT(0)
         }
+        WM_SETTINGCHANGE | WM_THEMECHANGED => {
+            palette::refresh();
+            let _ = InvalidateRect(Some(hwnd), None, true);
+            LRESULT(0)
+        }
         WM_TIMER => {
             #[cfg(debug_assertions)]
             {

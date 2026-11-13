@@ -3,10 +3,10 @@
 use super::*;
 
 pub(crate) unsafe fn draw_frame(hdc: HDC, left: i32, top: i32, right: i32, bottom: i32) {
-    fill(hdc, left, top, right, top + 1, BORDER);
-    fill(hdc, left, bottom - 1, right, bottom, BORDER);
-    fill(hdc, left, top, left + 1, bottom, BORDER);
-    fill(hdc, right - 1, top, right, bottom, BORDER);
+    fill(hdc, left, top, right, top + 1, palette::border());
+    fill(hdc, left, bottom - 1, right, bottom, palette::border());
+    fill(hdc, left, top, left + 1, bottom, palette::border());
+    fill(hdc, right - 1, top, right, bottom, palette::border());
 }
 
 pub(crate) unsafe fn draw_control(
@@ -43,9 +43,9 @@ pub(crate) unsafe fn draw_control_state(
     interactive: bool,
 ) {
     let background = if enabled && interactive && hovering(rect) {
-        HOVER
+        palette::hover()
     } else {
-        WHITE
+        palette::white()
     };
     fill(hdc, rect.left, rect.top, rect.right, rect.bottom, background);
     draw_frame(hdc, rect.left, rect.top, rect.right, rect.bottom);
@@ -53,11 +53,11 @@ pub(crate) unsafe fn draw_control_state(
     if let Some(checked) = checked {
         let size = scale(11, dpi);
         let y = rect.top + (rect.bottom - rect.top - size) / 2;
-        fill(hdc, x, y, x + size, y + size, WHITE);
+        fill(hdc, x, y, x + size, y + size, palette::white());
         draw_frame(hdc, x, y, x + size, y + size);
         if checked {
             let inset = scale(3, dpi).max(1);
-            fill(hdc, x + inset, y + inset, x + size - inset, y + size - inset, BAR);
+            fill(hdc, x + inset, y + inset, x + size - inset, y + size - inset, palette::bar());
         }
         x += size + scale(5, dpi);
     }
@@ -68,18 +68,18 @@ pub(crate) unsafe fn draw_control_state(
         x,
         rect.top + scale(3, dpi),
         &wide(text),
-        if enabled { TEXT } else { MUTED },
+        if enabled { palette::text() } else { palette::muted() },
     );
     let _ = RestoreDC(hdc, saved);
 }
 
 pub(crate) unsafe fn paint_preamp_row(hdc: HDC, dpi: u32, y: i32, db: f64, enabled: bool) {
     let title = fit_text(&i18n::tr("Preamp"), 76);
-    draw_text(hdc, scale(42, dpi), y + scale(5, dpi), &wide(&title), if enabled { TEXT } else { MUTED });
+    draw_text(hdc, scale(42, dpi), y + scale(5, dpi), &wide(&title), if enabled { palette::text() } else { palette::muted() });
     let mut track = preamp_slider_rect(dpi, y);
     track.right = scale(470, dpi);
     let track_bg = if hovering(&track) {
-        HOVER
+        palette::hover()
     } else {
         COLORREF(0x00E8_E8E8)
     };
@@ -87,7 +87,7 @@ pub(crate) unsafe fn paint_preamp_row(hdc: HDC, dpi: u32, y: i32, db: f64, enabl
     draw_frame(hdc, track.left, track.top, track.right, track.bottom);
     let t = ((db.clamp(-20.0, 20.0) + 20.0) / 40.0) as f32;
     let thumb_x = track.left + ((track.right - track.left) as f32 * t) as i32;
-    fill(hdc, thumb_x - scale(2, dpi), track.top, thumb_x + scale(2, dpi), track.bottom, BAR);
+    fill(hdc, thumb_x - scale(2, dpi), track.top, thumb_x + scale(2, dpi), track.bottom, palette::bar());
     draw_control(
         hdc,
         dpi,
@@ -109,7 +109,7 @@ pub(crate) unsafe fn paint_biquad_row(hdc: HDC, dpi: u32, y: i32, editor: &eapo_
 
 pub(crate) unsafe fn paint_delay_row(hdc: HDC, dpi: u32, y: i32, delay: f64, is_ms: bool, enabled: bool) {
     let title = fit_text(&i18n::tr("Delay"), 76);
-    draw_text(hdc, scale(42, dpi), y + scale(5, dpi), &wide(&title), if enabled { TEXT } else { MUTED });
+    draw_text(hdc, scale(42, dpi), y + scale(5, dpi), &wide(&title), if enabled { palette::text() } else { palette::muted() });
     let rects = delay_field_rects(dpi, y);
     draw_control(hdc, dpi, &rects[0], &format!("{delay:.2}"), enabled, None);
     let unit = if is_ms {
@@ -121,7 +121,7 @@ pub(crate) unsafe fn paint_delay_row(hdc: HDC, dpi: u32, y: i32, delay: f64, is_
 }
 
 pub(crate) unsafe fn paint_stage_row(hdc: HDC, dpi: u32, y: i32, pre_mix: bool, post_mix: bool, capture: bool, enabled: bool) {
-    draw_text(hdc, scale(42, dpi), y + scale(5, dpi), &wide("Stage"), if enabled { TEXT } else { MUTED });
+    draw_text(hdc, scale(42, dpi), y + scale(5, dpi), &wide("Stage"), if enabled { palette::text() } else { palette::muted() });
     let rects = stage_field_rects(dpi, y);
     draw_control(hdc, dpi, &rects[0], &i18n::tr("Pre-mix"), enabled, Some(pre_mix));
     draw_control(hdc, dpi, &rects[1], &i18n::tr("Post-mix"), enabled, Some(post_mix));
@@ -318,7 +318,7 @@ pub(crate) unsafe fn paint_graphic_eq_row(
     }
 
     let plot = geq_plot_rect(dpi, y, row_height, width);
-    fill(hdc, plot.left, plot.top, plot.right, plot.bottom, WHITE);
+    fill(hdc, plot.left, plot.top, plot.right, plot.bottom, palette::white());
     draw_frame(hdc, plot.left, plot.top, plot.right, plot.bottom);
     let view = GeqView::new(editor);
     let db_high = view.db_at(plot.top as f32, &plot);
@@ -327,12 +327,12 @@ pub(crate) unsafe fn paint_graphic_eq_row(
     let mut db = (db_high / step).floor() * step;
     while db >= db_low - 1e-9 {
         let line_y = view.y_of(db, &plot).round() as i32;
-        fill(hdc, plot.left, line_y, plot.right, line_y + 1, GRID);
+        fill(hdc, plot.left, line_y, plot.right, line_y + 1, palette::grid());
         db -= step;
     }
     if db_low <= 0.0 && db_high >= 0.0 {
         let zero_line = view.y_of(0.0, &plot).round() as i32;
-        fill(hdc, plot.left, zero_line, plot.right, zero_line + 1, BORDER);
+        fill(hdc, plot.left, zero_line, plot.right, zero_line + 1, palette::border());
     }
     for frequency in [
         1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0,
@@ -340,7 +340,7 @@ pub(crate) unsafe fn paint_graphic_eq_row(
     ] {
         let x = view.x_of(frequency, &plot).round() as i32;
         if x >= plot.left && x < plot.right {
-            fill(hdc, x, plot.top, x + 1, plot.bottom, GRID);
+            fill(hdc, x, plot.top, x + 1, plot.bottom, palette::grid());
         }
     }
     let zero_y = view.y_of(0.0, &plot);
@@ -369,8 +369,8 @@ pub(crate) unsafe fn paint_graphic_eq_row(
     if positive.len() >= 2 {
         positive_areas.push(positive);
     }
-    draw_aa_filled_areas(hdc, offset, &positive_areas, zero_y, plot, FILL_POS);
-    draw_aa_runs(hdc, offset, &[(CURVE, curve)], plot);
+    draw_aa_filled_areas(hdc, offset, &positive_areas, zero_y, plot, palette::fill_pos());
+    draw_aa_runs(hdc, offset, &[(palette::curve(), curve)], plot);
     let half = scale(3, dpi);
     for (index, node) in editor.nodes.iter().enumerate() {
         let x = view.x_of(node.freq, &plot).round() as i32;
@@ -384,34 +384,34 @@ pub(crate) unsafe fn paint_graphic_eq_row(
         {
             continue;
         }
-        let color = if editor.selected.contains(&index) { CURVE_POS } else { CURVE };
+        let color = if editor.selected.contains(&index) { palette::curve_pos() } else { palette::curve() };
         fill(hdc, x - half, py - half, x + half, py + half, color);
     }
 
     // Node table (original Editor: Freq./Gain columns next to the plot).
     let table = geq_table_rect(dpi, y, row_height, width);
-    fill(hdc, table.left, table.top, table.right, table.bottom, WHITE);
+    fill(hdc, table.left, table.top, table.right, table.bottom, palette::white());
     draw_frame(hdc, table.left, table.top, table.right, table.bottom);
     let (first_row, row_h) = geq_table_metrics(dpi, &table);
     let split = geq_table_column_split(dpi, &table);
     let visible = geq_table_visible_rows(dpi, &table);
     let top = geq_table_top_clamped(table_top, editor.nodes.len(), visible);
-    fill(hdc, table.left + 1, table.top + 1, table.right - 1, first_row - 1, CHROME_BG);
-    fill(hdc, split, table.top + 1, split + 1, table.bottom - 1, BORDER);
-    fill(hdc, table.left + 1, first_row - 1, table.right - 1, first_row, BORDER);
+    fill(hdc, table.left + 1, table.top + 1, table.right - 1, first_row - 1, palette::chrome_bg());
+    fill(hdc, split, table.top + 1, split + 1, table.bottom - 1, palette::border());
+    fill(hdc, table.left + 1, first_row - 1, table.right - 1, first_row, palette::border());
     draw_text(
         hdc,
         table.left + scale(4, dpi),
         table.top + scale(2, dpi),
         &wide(&i18n::tr("Freq.")),
-        TEXT,
+        palette::text(),
     );
     draw_text(
         hdc,
         split + scale(4, dpi),
         table.top + scale(2, dpi),
         &wide(&i18n::tr("Gain")),
-        TEXT,
+        palette::text(),
     );
     for (offset, index) in (top..editor.nodes.len()).take(visible).enumerate() {
         let cell_top = first_row + offset as i32 * row_h;
@@ -430,14 +430,14 @@ pub(crate) unsafe fn paint_graphic_eq_row(
                 bottom: cell_top + row_h,
             };
             let background = if selected {
-                SELECTED
+                palette::selected()
             } else if enabled && hovering(&cell) {
-                HOVER
+                palette::hover()
             } else {
-                WHITE
+                palette::white()
             };
             fill(hdc, left, cell_top, right, cell_top + row_h, background);
-            fill(hdc, left, cell_top + row_h - 1, right, cell_top + row_h, BORDER);
+            fill(hdc, left, cell_top + row_h - 1, right, cell_top + row_h, palette::border());
             let text = if column == 0 {
                 format_geq_value(node.freq)
             } else {
@@ -448,7 +448,7 @@ pub(crate) unsafe fn paint_graphic_eq_row(
                 left + scale(4, dpi),
                 cell_top + scale(3, dpi),
                 &wide(&text),
-                if enabled { TEXT } else { MUTED },
+                if enabled { palette::text() } else { palette::muted() },
             );
         }
     }
@@ -478,7 +478,7 @@ pub(crate) unsafe fn paint_graphic_eq_row(
             thumb_top,
             bar_x + scale(3, dpi),
             thumb_top + thumb_height,
-            BAR,
+            palette::bar(),
         );
     }
 }
@@ -493,7 +493,7 @@ pub(crate) unsafe fn paint_path_row(
     enabled: bool,
 ) {
     let title = fit_text(&i18n::tr(title), 76);
-    draw_text(hdc, scale(42, dpi), y + scale(5, dpi), &wide(&title), if enabled { TEXT } else { MUTED });
+    draw_text(hdc, scale(42, dpi), y + scale(5, dpi), &wide(&title), if enabled { palette::text() } else { palette::muted() });
     let rects = path_row_rects(dpi, y);
     let shown = if path.is_empty() { "(none)" } else { path };
     draw_control_flat(hdc, dpi, &rects[0], &shorten(shown, 60), enabled, None);
@@ -526,7 +526,7 @@ pub(crate) unsafe fn paint_vst_row(
     let rects = path_row_rects(dpi, y);
     let shown = if vst.path.is_empty() { "(none)" } else { &vst.path };
     let title = fit_text(&i18n::tr("VST plugin"), 76);
-    draw_text(hdc, scale(42, dpi), y + scale(5, dpi), &wide(&title), if enabled { TEXT } else { MUTED });
+    draw_text(hdc, scale(42, dpi), y + scale(5, dpi), &wide(&title), if enabled { palette::text() } else { palette::muted() });
     draw_control(hdc, dpi, &rects[0], &shorten(shown, 60), enabled, None);
     draw_control(hdc, dpi, &rects[1], &i18n::tr("Select file"), enabled, None);
     let actions = vst_action_rects(dpi, y);
@@ -536,7 +536,7 @@ pub(crate) unsafe fn paint_vst_row(
         scale(42, dpi),
         y + scale(35, dpi),
         &wide(&status),
-        if warning { WARNING } else if enabled { TEXT } else { MUTED },
+        if warning { palette::warning() } else if enabled { palette::text() } else { palette::muted() },
     );
     draw_control(hdc, dpi, &actions[0], &i18n::tr("Open panel"), enabled, None);
     draw_control(hdc, dpi, &actions[1], &i18n::tr("Options"), enabled, None);
@@ -553,7 +553,7 @@ pub(crate) unsafe fn paint_loudness_row(
 ) {
     // There is no short "Loudness" translation in the original catalog and the
     // row title only has ~38 px before the first field, so keep it short.
-    draw_text(hdc, scale(42, dpi), y + scale(5, dpi), &wide("Loudness"), if enabled { TEXT } else { MUTED });
+    draw_text(hdc, scale(42, dpi), y + scale(5, dpi), &wide("Loudness"), if enabled { palette::text() } else { palette::muted() });
     let field = |short: &str, source: &str, value: String| {
         if i18n::language() == i18n::Language::English {
             format!("{short} {value}")
@@ -598,13 +598,13 @@ pub(crate) unsafe fn paint_summary_row(
     enabled: bool,
 ) {
     let title = fit_text(&i18n::tr(title), 76);
-    draw_text(hdc, scale(42, dpi), y + scale(5, dpi), &wide(&title), if enabled { TEXT } else { MUTED });
+    draw_text(hdc, scale(42, dpi), y + scale(5, dpi), &wide(&title), if enabled { palette::text() } else { palette::muted() });
     draw_text(
         hdc,
         scale(120, dpi),
         y + scale(5, dpi),
         &wide(&shorten(summary, 70)),
-        if enabled { TEXT } else { MUTED },
+        if enabled { palette::text() } else { palette::muted() },
     );
     let button = change_button_rect(dpi, y);
     draw_control(hdc, dpi, &button, &i18n::tr("Change..."), enabled, None);
@@ -612,7 +612,7 @@ pub(crate) unsafe fn paint_summary_row(
 
 pub(crate) unsafe fn paint_copy_row(hdc: HDC, dpi: u32, y: i32, parameters: &str, enabled: bool) {
     let title = fit_text(&i18n::tr("Copy"), 76);
-    draw_text(hdc, scale(42, dpi), y + scale(5, dpi), &wide(&title), if enabled { TEXT } else { MUTED });
+    draw_text(hdc, scale(42, dpi), y + scale(5, dpi), &wide(&title), if enabled { palette::text() } else { palette::muted() });
     let mut line_y = y + scale(28, dpi);
     for part in parameters.split(';').take(3) {
         draw_text(
@@ -620,7 +620,7 @@ pub(crate) unsafe fn paint_copy_row(hdc: HDC, dpi: u32, y: i32, parameters: &str
             scale(48, dpi),
             line_y,
             &wide(&shorten(part.trim(), 80)),
-            if enabled { TEXT } else { MUTED },
+            if enabled { palette::text() } else { palette::muted() },
         );
         line_y += scale(18, dpi);
     }

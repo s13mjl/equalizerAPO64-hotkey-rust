@@ -7,13 +7,13 @@ impl App {
         if bottom <= top {
             return;
         }
-        fill(hdc, 0, top, width, bottom, PLOT_BG);
-        fill(hdc, 0, top, width, top + 1, BORDER);
+        fill(hdc, 0, top, width, bottom, palette::plot_bg());
+        fill(hdc, 0, top, width, top + 1, palette::border());
 
         let left_width = scale(250, self.dpi);
         let margin = scale(12, self.dpi);
         SelectObject(hdc, HGDIOBJ(self.bold.0));
-        draw_text(hdc, margin, top + scale(8, self.dpi), &trw("Analysis"), TEXT);
+        draw_text(hdc, margin, top + scale(8, self.dpi), &trw("Analysis"), palette::text());
         SelectObject(hdc, HGDIOBJ(self.body.0));
 
         let mut line_y = top + scale(30, self.dpi);
@@ -23,7 +23,7 @@ impl App {
                 let peak_color = if result.peak_gain > 0.0 {
                     COLORREF(0x0020_20C0)
                 } else {
-                    TEXT
+                    palette::text()
                 };
                 for (label, value_color) in [
                     (format!("{} {:.2} dB", i18n::tr("Peak gain:"), result.peak_gain), peak_color),
@@ -36,17 +36,17 @@ impl App {
                             result.latency as f64 * 1000.0
                                 / result.freq_data_sample_rate.max(1) as f64
                         ),
-                        TEXT,
+                        palette::text(),
                     ),
-                    (format!("{} {:.1} ms", i18n::tr("Init:"), result.initialization_time), TEXT),
-                    (format!("{} {:.2} %", i18n::tr("CPU usage:"), result.cpu_usage()), TEXT),
+                    (format!("{} {:.1} ms", i18n::tr("Init:"), result.initialization_time), palette::text()),
+                    (format!("{} {:.2} %", i18n::tr("CPU usage:"), result.cpu_usage()), palette::text()),
                     (
                         format!("{} {}", i18n::tr("Resolution:"), self.analysis_effective_resolution),
-                        MUTED,
+                        palette::muted(),
                     ),
                     (
                         format!("{} {}", i18n::tr("Channels:"), shorten(&self.channel_names.join(" "), 28)),
-                        MUTED,
+                        palette::muted(),
                     ),
                 ] {
                     draw_text(hdc, margin, line_y, &wide(&label), value_color);
@@ -54,7 +54,7 @@ impl App {
                 }
             }
             None => {
-                draw_text(hdc, margin, line_y, &trw("Analyzing..."), MUTED);
+                draw_text(hdc, margin, line_y, &trw("Analyzing..."), palette::muted());
             }
         }
 
@@ -106,7 +106,7 @@ impl App {
                     "Resolution reduced to %0 to limit memory",
                     &[&self.analysis_effective_resolution.to_string()],
                 )),
-                WARNING,
+                palette::warning(),
             );
         }
 
@@ -152,13 +152,13 @@ impl App {
             if y < plot_top || y >= plot_bottom {
                 continue;
             }
-            fill(hdc, plot_left, y, plot_right, y + 1, if db == 0 { BORDER } else { GRID });
+            fill(hdc, plot_left, y, plot_right, y + 1, if db == 0 { palette::border() } else { palette::grid() });
             draw_text(
                 hdc,
                 plot_left + scale(2, self.dpi),
                 y + scale(1, self.dpi),
                 &wide(&format!("{db}")),
-                MUTED,
+                palette::muted(),
             );
         }
         for step in [1u32, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000] {
@@ -170,21 +170,21 @@ impl App {
             if x < plot_left || x >= plot_right {
                 continue;
             }
-            fill(hdc, x, plot_top, x + 1, plot_bottom, GRID);
+            fill(hdc, x, plot_top, x + 1, plot_bottom, palette::grid());
             draw_text(
                 hdc,
                 x + scale(2, self.dpi),
                 plot_bottom - scale(14, self.dpi),
                 &wide(&format!("{step:.0}")),
-                MUTED,
+                palette::muted(),
             );
         }
 
         // Crosshair and readout under the cursor.
         if let Some((hover_x, hover_y)) = self.plot_hover {
             if hover_x >= plot_left && hover_x < plot_right && hover_y >= plot_top && hover_y < plot_bottom {
-                fill(hdc, hover_x, plot_top, hover_x + 1, plot_bottom, BORDER);
-                fill(hdc, plot_left, hover_y, plot_right, hover_y + 1, BORDER);
+                fill(hdc, hover_x, plot_top, hover_x + 1, plot_bottom, palette::border());
+                fill(hdc, plot_left, hover_y, plot_right, hover_y + 1, palette::border());
                 let hz = plot.freq_at((hover_x - plot_left) as f32);
                 let db = plot.db_at((hover_y - plot_top) as f32);
                 let label = if hz >= 1000.0 {
@@ -202,9 +202,9 @@ impl App {
                     label_y - scale(1, self.dpi),
                     label_x + text_width,
                     label_y + scale(16, self.dpi),
-                    PLOT_BG,
+                    palette::plot_bg(),
                 );
-                draw_text(hdc, label_x, label_y, &text, TEXT);
+                draw_text(hdc, label_x, label_y, &text, palette::text());
             }
         }
 
@@ -265,7 +265,7 @@ impl App {
                 let Some((_, scene_y)) = plot.pos_for(hz, db) else {
                     if path_open && run_points.len() >= 2 {
                         runs.push((
-                            if run_positive { CURVE_POS } else { CURVE },
+                            if run_positive { palette::curve_pos() } else { palette::curve() },
                             std::mem::take(&mut run_points),
                         ));
                     }
@@ -285,7 +285,7 @@ impl App {
                 if path_open && positive != run_positive {
                     if run_points.len() >= 2 {
                         runs.push((
-                            if run_positive { CURVE_POS } else { CURVE },
+                            if run_positive { palette::curve_pos() } else { palette::curve() },
                             std::mem::take(&mut run_points),
                         ));
                     }
@@ -302,7 +302,7 @@ impl App {
                 path_open = true;
             }
             if path_open && run_points.len() >= 2 {
-                runs.push((if run_positive { CURVE_POS } else { CURVE }, run_points));
+                runs.push((if run_positive { palette::curve_pos() } else { palette::curve() }, run_points));
             }
             self.analysis_curve = Some(AnalysisCurve {
                 key: curve_key,
@@ -314,7 +314,7 @@ impl App {
         let _ = IntersectClipRect(hdc, plot_left, plot_top, plot_right, plot_bottom);
         if let Some(curve) = &self.analysis_curve {
             for &(left, top, right, bottom) in &curve.fills {
-                fill(hdc, left, top, right, bottom, FILL_POS);
+                fill(hdc, left, top, right, bottom, palette::fill_pos());
             }
             draw_aa_runs(hdc, self.paint_offset, &curve.runs, self.plot_rect);
         }

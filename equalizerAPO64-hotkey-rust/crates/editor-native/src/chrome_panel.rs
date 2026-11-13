@@ -5,7 +5,7 @@ use super::*;
 impl App {
     pub(super) unsafe fn paint_chrome(&mut self, hdc: HDC, width: i32, chrome: i32) {
         let old_font = SelectObject(hdc, HGDIOBJ(self.body.0));
-        fill(hdc, 0, 0, width, chrome, CHROME_BG);
+        fill(hdc, 0, 0, width, chrome, palette::chrome_bg());
 
         if self.show_toolbar {
             let margin = scale(8, self.dpi);
@@ -25,12 +25,12 @@ impl App {
                     instant_rect.top,
                     instant_rect.right,
                     instant_rect.bottom,
-                    HOVER,
+                    palette::hover(),
                 );
             }
             let check_size = scale(13, self.dpi);
             let check_y = button_y + (button_h - check_size) / 2;
-            fill(hdc, x, check_y, x + check_size, check_y + check_size, WHITE);
+            fill(hdc, x, check_y, x + check_size, check_y + check_size, palette::white());
             self.frame(hdc, x, check_y, x + check_size, check_y + check_size);
             if self.instant_mode {
                 let inset = scale(3, self.dpi).max(1);
@@ -40,11 +40,11 @@ impl App {
                     check_y + inset,
                     x + check_size - inset,
                     check_y + check_size - inset,
-                    BAR,
+                    palette::bar(),
                 );
             }
             x += check_size + scale(5, self.dpi);
-            draw_text(hdc, x, button_y + scale(4, self.dpi), &self.labels.instant, TEXT);
+            draw_text(hdc, x, button_y + scale(4, self.dpi), &self.labels.instant, palette::text());
 
             let layout = self.toolbar_layout();
             let device_rect = layout[1];
@@ -84,7 +84,7 @@ impl App {
         }
 
         let tab_top = self.tab_top();
-        fill(hdc, 0, tab_top, width, chrome, CHROME_BG);
+        fill(hdc, 0, tab_top, width, chrome, palette::chrome_bg());
         for (index, rect) in self.tab_layout() {
             let tab = &self.tabs[index];
             let title = format!("{}{}", tab.title, if tab.dirty { " *" } else { "" });
@@ -97,11 +97,11 @@ impl App {
                 rect.right,
                 rect.bottom,
                 if active {
-                    WHITE
+                    palette::white()
                 } else if hover {
-                    HOVER
+                    palette::hover()
                 } else {
-                    CHROME_BG
+                    palette::chrome_bg()
                 },
             );
             self.frame(hdc, rect.left, rect.top, rect.right, rect.bottom);
@@ -122,7 +122,7 @@ impl App {
                 rect.left + scale(8, self.dpi),
                 tab_top + scale(6, self.dpi),
                 &wide(&shown),
-                if active { TEXT } else { MUTED },
+                if active { palette::text() } else { palette::muted() },
             );
             let _ = RestoreDC(hdc, saved);
             draw_text(
@@ -130,10 +130,10 @@ impl App {
                 rect.right - scale(16, self.dpi),
                 tab_top + scale(6, self.dpi),
                 &wide("x"),
-                MUTED,
+                palette::muted(),
             );
         }
-        fill(hdc, 0, chrome - 1, width, chrome, BORDER);
+        fill(hdc, 0, chrome - 1, width, chrome, palette::border());
         SelectObject(hdc, old_font);
     }
 
@@ -150,10 +150,10 @@ impl App {
             y,
             x + w,
             y + h,
-            if self.is_hot_rect(&rect) { HOVER } else { WHITE },
+            if self.is_hot_rect(&rect) { palette::hover() } else { palette::white() },
         );
         self.frame(hdc, x, y, x + w, y + h);
-        draw_text(hdc, x + scale(8, self.dpi), y + scale(4, self.dpi), label, TEXT);
+        draw_text(hdc, x + scale(8, self.dpi), y + scale(4, self.dpi), label, palette::text());
     }
 
     pub(super) unsafe fn paint_combo(&self, hdc: HDC, x: i32, y: i32, w: i32, h: i32, label: &[u16]) {
@@ -169,7 +169,7 @@ impl App {
             y,
             x + w,
             y + h,
-            if self.is_hot_rect(&rect) { HOVER } else { WHITE },
+            if self.is_hot_rect(&rect) { palette::hover() } else { palette::white() },
         );
         self.frame(hdc, x, y, x + w, y + h);
         let arrow_x = x + w - scale(14, self.dpi);
@@ -181,7 +181,7 @@ impl App {
             arrow_x - scale(2, self.dpi),
             y + h,
         );
-        draw_text(hdc, x + scale(6, self.dpi), y + scale(4, self.dpi), label, TEXT);
+        draw_text(hdc, x + scale(6, self.dpi), y + scale(4, self.dpi), label, palette::text());
         let _ = RestoreDC(hdc, saved);
         let arrow_y = y + h / 2 - scale(2, self.dpi);
         for row in 0..scale(4, self.dpi) {
@@ -192,15 +192,15 @@ impl App {
                 arrow_y + row,
                 arrow_x + scale(8, self.dpi) - half,
                 arrow_y + row + 1,
-                MUTED,
+                palette::muted(),
             );
         }
     }
 
     pub(super) unsafe fn frame(&self, hdc: HDC, left: i32, top: i32, right: i32, bottom: i32) {
-        fill(hdc, left, top, right, top + 1, BORDER);
-        fill(hdc, left, bottom - 1, right, bottom, BORDER);
-        fill(hdc, left, top, left + 1, bottom, BORDER);
-        fill(hdc, right - 1, top, right, bottom, BORDER);
+        fill(hdc, left, top, right, top + 1, palette::border());
+        fill(hdc, left, bottom - 1, right, bottom, palette::border());
+        fill(hdc, left, top, left + 1, bottom, palette::border());
+        fill(hdc, right - 1, top, right, bottom, palette::border());
     }
 }
