@@ -51,7 +51,9 @@ use eapo_common::channel_helper;
 use eapo_common::device_files;
 use eapo_editor_core::analysis::{AnalysisRequest, AnalysisResult, AnalysisThread, DeviceSnapshot};
 use eapo_editor_core::calibration;
-use eapo_editor_core::config_file::{load_config_lines, save_config_file};
+use eapo_editor_core::config_file::{
+    is_preamp_only_line, load_config_lines, retain_preamp_only, save_config_file,
+};
 use eapo_editor_core::i18n;
 use eapo_editor_core::file_dialog::FileDialog;
 use eapo_editor_core::hotkey::HotkeyManager;
@@ -160,66 +162,10 @@ const ANALYSIS_RESOLUTIONS: [i32; 16] = [
     2097152, 4194304,
 ];
 
-const ADD_GROUPS: &[(&str, &[(&str, &str)])] = &[    (
-        "Control",
-        &[
-            ("Include...", "Include:"),
-            ("Device...", "Device: all"),
-            ("Channel...", "Channel: all"),
-            ("Stage...", "Stage: post-mix"),
-        ],
-    ),
-    (
-        "Basic filters",
-        &[
-            ("Preamp", "Preamp: 0 dB"),
-            ("Delay", "Delay: 0 ms"),
-            ("Copy", "Copy: "),
-        ],
-    ),
-    (
-        "Parametric filters",
-        &[
-            ("Peaking filter", "Filter: ON PK Fc 100 Hz Gain 0 dB Q 10"),
-            ("Low-pass filter", "Filter: ON LP Fc 100 Hz"),
-            ("High-pass filter", "Filter: ON HP Fc 100 Hz"),
-            ("Band-pass filter", "Filter: ON BP Fc 100 Hz Q 10"),
-            ("Low-shelf filter", "Filter: ON LS Fc 100 Hz Gain 0 dB"),
-            ("High-shelf filter", "Filter: ON HS Fc 100 Hz Gain 0 dB"),
-            ("Notch filter", "Filter: ON NO Fc 100 Hz"),
-            ("All-pass filter", "Filter: ON AP Fc 100 Hz Q 10"),
-        ],
-    ),
-    (
-        "Graphic equalizers",
-        &[
-            (
-                "15-band graphic equalizer",
-                "GraphicEQ: 25 0; 40 0; 63 0; 100 0; 160 0; 250 0; 400 0; 630 0; 1000 0; 1600 0; 2500 0; 4000 0; 6300 0; 10000 0; 16000 0",
-            ),
-            (
-                "31-band graphic equalizer",
-                "GraphicEQ: 20 0; 25 0; 31.5 0; 40 0; 50 0; 63 0; 80 0; 100 0; 125 0; 160 0; 200 0; 250 0; 315 0; 400 0; 500 0; 630 0; 800 0; 1000 0; 1250 0; 1600 0; 2000 0; 2500 0; 3150 0; 4000 0; 5000 0; 6300 0; 8000 0; 10000 0; 12500 0; 16000 0; 20000 0",
-            ),
-            ("Graphic equalizer with variable bands", "GraphicEQ: "),
-        ],
-    ),
-    (
-        "Advanced filters",
-        &[
-            (
-                "Convolution...",
-                "Convolution:",
-            ),
-            (
-                "Loudness correction",
-                "LoudnessCorrection: State 1 ReferenceLevel 0 ReferenceOffset 0 Attenuation 1.0",
-            ),
-        ],
-    ),
-    ("Plugins", &[("VST plugin...", "VSTPlugin:")]),
-    ("Other", &[("Comment", "# ")]),
-];
+const ADD_GROUPS: &[(&str, &[(&str, &str)])] = &[(
+    "Basic filters",
+    &[("Preamp", "Preamp: 0 dB")],
+)];
 
 #[cfg(debug_assertions)]
 static SCROLL_TEST: AtomicBool = AtomicBool::new(false);

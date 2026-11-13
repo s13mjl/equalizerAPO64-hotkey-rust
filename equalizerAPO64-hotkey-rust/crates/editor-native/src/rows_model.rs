@@ -4,6 +4,8 @@ use super::*;
 
 impl App {
     pub(super) fn set_lines(&mut self, lines: Vec<String>) {
+        let mut lines = lines;
+        retain_preamp_only(&mut lines);
         self.rows.clear();
         self.rows.reserve(lines.len());
         let row_state = self

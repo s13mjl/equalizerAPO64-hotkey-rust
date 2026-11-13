@@ -28,53 +28,13 @@ pub struct FilterTemplate {
 }
 
 /// Same catalogue and ordering as the factory list in `FilterTable.cpp`.
+/// The trimmed build only offers the preamp.
 pub fn filter_templates() -> Vec<FilterTemplate> {
-    let mut t = Vec::new();
-    let mut add = |name: &str, line: &str, path: &[&str]| {
-        t.push(FilterTemplate {
-            name: crate::i18n::tr(name),
-            line: line.into(),
-            path: path
-                .iter()
-                .map(|s| crate::i18n::tr(s))
-                .collect(),
-        });
-    };
-    add("Comment", "# ", &[]);
-    add("Include (Include configuration file)", "Include:", &["Control"]);
-    add("Device (Select device)", "Device: all", &["Control"]);
-    add("Channel (Select channels)", "Channel: all", &["Control"]);
-    add("Stage (Select processing stage)", "Stage: post-mix", &["Control"]);
-    add("Preamp (Preamplification)", "Preamp: 0 dB", &["Basic filters"]);
-    add("Peaking filter", "Filter: ON PK Fc 100 Hz Gain 0 dB Q 10", &["Parametric filters"]);
-    add("Low-pass filter", "Filter: ON LP Fc 100 Hz", &["Parametric filters"]);
-    add("High-pass filter", "Filter: ON HP Fc 100 Hz", &["Parametric filters"]);
-    add("Band-pass filter", "Filter: ON BP Fc 100 Hz Q 10", &["Parametric filters"]);
-    add("Low-shelf filter", "Filter: ON LS Fc 100 Hz Gain 0 dB", &["Parametric filters"]);
-    add("High-shelf filter", "Filter: ON HS Fc 100 Hz Gain 0 dB", &["Parametric filters"]);
-    add("Notch filter", "Filter: ON NO Fc 100 Hz", &["Parametric filters"]);
-    add("All-pass filter", "Filter: ON AP Fc 100 Hz Q 10", &["Parametric filters"]);
-    add("Delay", "Delay: 0 ms", &["Basic filters"]);
-    add("Copy (Copy between channels)", "Copy: ", &["Basic filters"]);
-    add(
-        "15-band graphic equalizer",
-        "GraphicEQ: 25 0; 40 0; 63 0; 100 0; 160 0; 250 0; 400 0; 630 0; 1000 0; 1600 0; 2500 0; 4000 0; 6300 0; 10000 0; 16000 0",
-        &["Graphic equalizers"],
-    );
-    add(
-        "31-band graphic equalizer",
-        "GraphicEQ: 20 0; 25 0; 31.5 0; 40 0; 50 0; 63 0; 80 0; 100 0; 125 0; 160 0; 200 0; 250 0; 315 0; 400 0; 500 0; 630 0; 800 0; 1000 0; 1250 0; 1600 0; 2000 0; 2500 0; 3150 0; 4000 0; 5000 0; 6300 0; 8000 0; 10000 0; 12500 0; 16000 0; 20000 0",
-        &["Graphic equalizers"],
-    );
-    add("Graphic equalizer with variable bands", "GraphicEQ: ", &["Graphic equalizers"]);
-    add("Convolution (Convolution with impulse response)", "Convolution:", &["Advanced filters"]);
-    add("VST plugin", "VSTPlugin:", &["Plugins"]);
-    add(
-        "Loudness correction",
-        "LoudnessCorrection: State 1 ReferenceLevel 0 ReferenceOffset 0 Attenuation 1.0",
-        &["Advanced filters"],
-    );
-    t
+    vec![FilterTemplate {
+        name: crate::i18n::tr("Preamp (Preamplification)"),
+        line: "Preamp: 0 dB".into(),
+        path: vec![crate::i18n::tr("Basic filters")],
+    }]
 }
 
 pub fn add_menu(ui: &mut egui::Ui, templates: &[FilterTemplate]) -> Option<String> {
@@ -375,7 +335,11 @@ impl FilterTab {
         }
         let use_prefs = text == clipboard.text && !clipboard.prefs.is_empty();
         let drop_row = self.items.iter().position(|i| self.selected.contains(&i.uid)).unwrap_or(self.items.len());
-        let mut lines: Vec<&str> = text.split('\n').collect();
+        let mut lines: Vec<&str> = text
+            .split('\n')
+            .map(|line| line.strip_suffix('\r').unwrap_or(line))
+            .filter(|line| is_preamp_only_line(line))
+            .collect();
         if lines.last() == Some(&"") {
             lines.pop();
         }
@@ -903,7 +867,9 @@ pub fn reorder_uids(ids: &mut Vec<u64>, selected: &HashSet<u64>, drop_row: usize
     None
 }
 
-pub use eapo_editor_core::config_file::{load_config_lines, save_config_file};
+pub use eapo_editor_core::config_file::{
+    is_preamp_only_line, load_config_lines, save_config_file,
+};
 
 pub fn file_title(path: &str) -> String {
     Path::new(path)

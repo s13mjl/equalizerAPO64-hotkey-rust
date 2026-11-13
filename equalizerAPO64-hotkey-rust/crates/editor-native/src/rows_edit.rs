@@ -4,6 +4,9 @@ use super::*;
 
 impl App {
     pub(super) fn apply_row_line(&mut self, index: usize, line: String) {
+        if !is_preamp_only_line(&line) {
+            return;
+        }
         let structural = parse_line(&line);
         let kind = structural.kind;
         let enabled = structural.enabled;
@@ -432,6 +435,9 @@ impl App {
     }
 
     pub(super) unsafe fn add_row(&mut self, hwnd: HWND, line: &str, before: Option<usize>) {
+        if !is_preamp_only_line(line) {
+            return;
+        }
         self.commit_edit(hwnd, true);
         let structural = parse_line(line);
         let height = row_height(structural.kind, self.dpi);
@@ -537,6 +543,7 @@ impl App {
             .split('\n')
             .map(|line| line.strip_suffix('\r').unwrap_or(line).to_string())
             .collect();
+        lines.retain(|line| is_preamp_only_line(line));
         if lines.is_empty() {
             return false;
         }

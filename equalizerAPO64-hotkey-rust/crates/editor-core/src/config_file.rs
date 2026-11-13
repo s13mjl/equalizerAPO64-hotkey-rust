@@ -50,6 +50,26 @@ pub fn save_config_file(path: &str, lines: &[String]) -> std::io::Result<()> {
     }
 }
 
+/// Lines this build accepts: the preamp, comments and blank lines.  Every
+/// other filter is stripped when a configuration is loaded.
+pub fn is_preamp_only_line(line: &str) -> bool {
+    let trimmed = line.trim();
+    trimmed.is_empty()
+        || trimmed.starts_with('#')
+        || trimmed
+            .split_once(':')
+            .is_some_and(|(command, _)| command.trim().eq_ignore_ascii_case("Preamp"))
+}
+
+/// Drops every filter except the preamp, keeping comments and blank lines so
+/// the file structure stays readable.
+pub fn retain_preamp_only(lines: &mut Vec<String>) {
+    lines.retain(|line| is_preamp_only_line(line));
+    if lines.is_empty() {
+        lines.push(String::new());
+    }
+}
+
 pub fn load_config_lines(path: &str) -> std::io::Result<Vec<String>> {
     let mut attempts = 0;
     let bytes = loop {
@@ -77,6 +97,7 @@ pub fn load_config_lines(path: &str) -> std::io::Result<Vec<String>> {
     if lines.is_empty() {
         lines.push(String::new());
     }
+    retain_preamp_only(&mut lines);
     Ok(lines)
 }
 
@@ -104,6 +125,25 @@ mod tests {
         std::fs::write(&path, b"\xef\xbb\xbfPreamp: 0 dB").unwrap();
         let loaded = load_config_lines(path.to_string_lossy().as_ref()).unwrap();
         assert_eq!(loaded, vec!["Preamp: 0 dB".to_string()]);
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn load_keeps_only_the_preamp() {
+        let path = std::env::temp_dir().join(format!(
+            "eapo_config_preamp_only_{}.txt",
+            std::process::id()
+        ));
+        std::fs::write(
+            &path,
+            b"Preamp: -6 dB\r\nFilter: ON PK Fc 100 Hz Gain 3 dB Q 1\r\n# note\r\nGraphicEQ: 25 0; 1000 0\r\n\r\nDevice: all",
+        )
+        .unwrap();
+        let loaded = load_config_lines(path.to_string_lossy().as_ref()).unwrap();
+        assert_eq!(
+            loaded,
+            vec!["Preamp: -6 dB".to_string(), "# note".to_string(), String::new()]
+        );
         let _ = std::fs::remove_file(&path);
     }
 
