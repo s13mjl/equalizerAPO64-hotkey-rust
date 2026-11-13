@@ -816,7 +816,7 @@ impl FilterTab {
 }
 
 fn commit_row_edit(item: &mut FilterItem, text: &str) {
-    if text == item.line {
+    if text == item.line || !is_preamp_only_line(text) {
         return;
     }
     item.line = text.to_string();
