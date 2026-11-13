@@ -200,6 +200,24 @@ pub(crate) unsafe extern "system" fn main_window_proc(
             let _ = InvalidateRect(Some(hwnd), None, false);
             LRESULT(0)
         }
+        WM_GETOBJECT => {
+            // Expose a standard MSAA client object so screen readers can at
+            // least announce the editor window and its document title.
+            if lparam.0 as i32 == OBJID_CLIENT.0 {
+                let mut accessible: *mut core::ffi::c_void = std::ptr::null_mut();
+                let created = CreateStdAccessibleObject(
+                    hwnd,
+                    OBJID_CLIENT.0,
+                    &IAccessible::IID,
+                    &mut accessible,
+                );
+                if created.is_ok() && !accessible.is_null() {
+                    let unknown = IUnknown::from_raw(accessible);
+                    return LresultFromObject(&IAccessible::IID, wparam, &unknown);
+                }
+            }
+            DefWindowProcW(hwnd, msg, wparam, lparam)
+        }
         WM_PAINT => {
             let mut paint = PAINTSTRUCT::default();
             let hdc = BeginPaint(hwnd, &mut paint);

@@ -65,7 +65,7 @@ use eapo_editor_core::model::{
 };
 use eapo_editor_core::settings::{self, GlobalPreferences};
 use eapo_filters::loudness_correction::volume_controller::VolumeController;
-use windows::core::{w, PCWSTR};
+use windows::core::{w, Interface, IUnknown, PCWSTR};
 use windows::Win32::Foundation::{COLORREF, HINSTANCE, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
 use windows::Win32::Graphics::GdiPlus::{
     GdipAddPathLine2, GdipClosePathFigure, GdipCreateFromHDC, GdipCreatePath, GdipCreatePen1,
@@ -87,6 +87,9 @@ use windows::Win32::Graphics::Gdi::{
     OUT_DEFAULT_PRECIS, PAINTSTRUCT, PS_SOLID, Polyline, SRCCOPY, TRANSPARENT,
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+use windows::Win32::UI::Accessibility::{
+    CreateStdAccessibleObject, IAccessible, LresultFromObject,
+};
 use windows::Win32::UI::Controls::{SetScrollInfo, WM_MOUSELEAVE};
 use windows::Win32::UI::HiDpi::{
     GetDpiForWindow, SetProcessDpiAwarenessContext, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
@@ -109,13 +112,13 @@ use windows::Win32::UI::WindowsAndMessaging::{
     TrackPopupMenuEx, TranslateMessage, CS_DBLCLKS, CS_HREDRAW, CS_VREDRAW, CW_USEDEFAULT, ES_AUTOHSCROLL,
     GWLP_USERDATA, GWLP_WNDPROC, HMENU, IDCANCEL, IDC_ARROW, IDYES,
     MB_ICONINFORMATION, MB_ICONQUESTION, MB_ICONWARNING, MB_OK, MB_YESNO, MB_YESNOCANCEL,
-    MF_BYCOMMAND, MF_BYPOSITION, MF_CHECKED,
+    MF_BYCOMMAND, MF_BYPOSITION, MF_CHECKED, OBJID_CLIENT,
     MF_POPUP, MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MF_GRAYED, MSG, SB_BOTTOM, SB_LINEDOWN,
     SB_LINEUP, SB_PAGEDOWN, SB_PAGEUP, SB_THUMBPOSITION, SB_THUMBTRACK, SB_TOP, SB_VERT,
     SCROLLINFO, SC_KEYMENU, SIF_PAGE, SIF_POS, SIF_RANGE, SWP_NOACTIVATE, SWP_NOZORDER, SW_RESTORE,
     SW_SHOW, SW_SHOWMAXIMIZED, SW_SHOWNORMAL,
     TPM_RETURNCMD, WM_APP, WM_CHAR, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_DPICHANGED,
-    WM_ERASEBKGND, WM_KEYDOWN, WM_KILLFOCUS, WM_LBUTTONDBLCLK, WM_LBUTTONDOWN, WM_LBUTTONUP,
+    WM_ERASEBKGND, WM_GETOBJECT, WM_KEYDOWN, WM_KILLFOCUS, WM_LBUTTONDBLCLK, WM_LBUTTONDOWN, WM_LBUTTONUP,
     WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_NCDESTROY, WM_PAINT, WM_PRINTCLIENT, WM_RBUTTONDOWN, WM_SETFONT,
     WM_SIZE, WM_SYSCHAR, WM_SYSKEYDOWN, WM_SYSCOMMAND,
     WM_SETTINGCHANGE, WM_THEMECHANGED,
