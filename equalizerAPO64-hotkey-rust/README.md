@@ -1,3 +1,5 @@
+English | [简体中文](README.zh-CN.md)
+
 # EqualizerAPO64-Hotkey — pure Rust port
 
 A 1:1 functional port of
